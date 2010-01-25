@@ -1,0 +1,7 @@
+# uninstallation:
+	mv ~/.emacs /tmp/old.emacs-`date +%s`
+	mv ~/.emacs-conf /tmp/old.emacs-conf-`date +%s`
+
+# installation:
+	cp -r . ~/.emacs-conf
+	ln -s ~/.emacs-conf/emacs-startup.el ~/.emacs
