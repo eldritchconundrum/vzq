@@ -23,3 +23,7 @@
 
 ;; other modes that may or may not be available
 (require 'inf-haskell nil t)
+
+(add-to-list 'load-path "~/.emacs-conf/scala/")
+(require 'scala-mode-auto nil t)
+

@@ -1,0 +1,21 @@
+! comments begin with '!'
+
+xterm*reverseVideo:		true
+xterm*color4:			#80A0FF
+xterm*color10:			#00DD00
+xterm*color14:			#00DDFF
+xterm*background:		black
+xterm*foreground:		white
+
+Emacs*font:			fixed
+Emacs*Foreground:		white
+Emacs*Background:		grey10
+! emacs top menu
+Emacs*menubar.foreground: 	grey80
+Emacs*menubar.background: 	grey20
+! emacs contextual mouse menu
+Emacs*menu*foreground:		grey80
+Emacs*menu*background:		grey10
+! Emacs*backgroundToolBarColor:	blue
+! Emacs*XlwScrollBar.Background:  yellow
+! Emacs*XlwScrollBar.Foreground:  green

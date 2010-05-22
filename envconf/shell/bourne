@@ -1,0 +1,28 @@
+
+alias l='ls -la'
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+alias m=make
+alias L=less
+
+which colordiff >/dev/null && alias diff=colordiff
+
+# easy directory changement
+alias ~="cd ~"
+alias -- -="cd -"
+alias ..="cd .."
+alias ...="cd ../.."
+
+function e ()
+{
+    if [[ -n "$DISPLAY" ]]; then
+        emacs -geometry 80x42 "$@" & disown
+    else
+        emacs "$@"
+    fi
+}
+
+function rot13 () {
+        tr 'a-z' 'n-za-m'
+}
