@@ -92,6 +92,9 @@ $p = Hash.new(0) # time profiling (ms)
 # TODO: scroller sur du background généré !
 # TODO: move animation logic (texture change) into the entities and out of sprite (not its business, unless it also handles the timing, which it doesn't)
 
+class Trajectoire # ça se dit comment en anglais d'ailleurs ?
+end
+
 class GameBase; end # forward decl for reloading
 class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up pause and autoplay
   attr_accessor :entities
@@ -132,8 +135,10 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 
   def init_state
     add_ship
-    @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite(['bg_moon.jpg']) }).with(:tags => [:background])
-  # @entities << Background.new(Point2D.new(0, 0), lambda { get_sprite([NoiseTextureDesc.new(Point2D.new(100, 100))]).with(:tags => [:background], :center => EngineConfig.ortho / 2) })
+    # @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite(['bg_moon.jpg']) }).with(:tags => [:background])
+    @entities << Background.new(Point2D.new(0, 0), lambda {
+                                  get_sprite([NoiseTextureDesc.new(Point2D.new(400, 300))])
+                                }).with(:tags => [:background])
   end
 
   # --- WaitManager events begin ---
@@ -203,6 +208,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def get_new_alien(pos, movement, is_boss = false)
     alien_anim = ['spaceinvaders/alien.gif', 'spaceinvaders/alien2.gif', 'spaceinvaders/alien.gif', 'spaceinvaders/alien3.gif']
     alien = Entity.new(get_sprite(alien_anim).with(:center => pos), movement).with(:life => 25, :tags => is_boss ? [:alien, :boss] : [:alien])
+    # stocker la fonction-trajectoire (faire une classe pour ça ?)
     if is_boss
       alien.sprites.first.zoom = 2.0
       alien.pos = Point2D.new(EngineConfig.ortho.x.to_f * 0.5, -50) - alien.sprites.first.size

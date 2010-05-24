@@ -35,7 +35,7 @@ class GameEngine
   def mainloop
     @renderer.renderFrame(@games.last)
     if @reload_code_wait.is_over_auto_reset
-      time = Utils.chrono { try_to_reload_code }
+      time = Utils.time { try_to_reload_code }
       puts("- reload: %s ms" % time)
     end
   end

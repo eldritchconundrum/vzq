@@ -1,10 +1,23 @@
-# generic additions to std lib
+# ruby-1.8 compat
 
-module Enumerable # for ruby-1.8 compat
+module Enumerable
   def count; n = 0; each { |x| n += 1 if yield(x) }; n; end
 end
-
+class Array
+  def shuffle
+    a = self.clone
+    (0..a.length-2).each { |i|
+      r = rand(a.length - i - 1) + i + 1
+      a[r], a[i] = a[i], a[r]
+    }
+    return a
+  end unless respond_to?(:shuffle)
+end
+raise 'unit test' if [1,2,3,4].shuffle.nil?
 raise 'unit test' if [1,2,3,4].count { |n| n % 2 == 0 } != 2
+
+# generic additions to std lib
+
 class Hash
   def cache(key, &block); self.has_key?(key) ? self[key] : (self[key] = block.call); end
 end
@@ -14,13 +27,14 @@ class Module
     alias_method((new_member.to_s + '=').to_sym, (aliased_member.to_s + '=').to_sym)
   end
 end
-class Fixnum
+class Numeric
   def next_power_of_two
     ret = 1
     while ret < self; ret *= 2; end
     ret
   end
 end
+raise 'unit test' if 5.next_power_of_two != 5.2.next_power_of_two
 class Object
   def with(hash)
     hash.each { |k, v| self.send(k.to_s.chomp('=') + '=', v) }
@@ -46,17 +60,12 @@ class Point2D
 end
 raise 'unit test' if Point2D.new(2, 4) != Point2D.new(2, 4) || Point2D.new(2, 3) == Point2D.new(1, 4)
 
-# specific
+# project-specific
 
 class Utils
   class << self
     @@timerTicksPerSecond = org.lwjgl.Sys.getTimerResolution
     def get_time; (org.lwjgl.Sys.getTime() * 1000) / @@timerTicksPerSecond; end # milliseconds
-    def chrono
-      date = get_time
-      yield
-      get_time - date
-    end
     def time # return ms spent in given block
       start = get_time
       yield
@@ -66,8 +75,8 @@ class Utils
 end
 
 class WaitManager
-  def initialize(item)
-    @item = item
+  def initialize(target)
+    @target = target
     @interval_funcs = {} # name -> func returning milliseconds
     @last_times = {} # name -> time
   end
@@ -81,7 +90,7 @@ class WaitManager
       interval = @interval_funcs[name].call # only call them again on code reload?
       if last_time + interval <= now
         @last_times[name] = now
-        @item.send(name)
+        @target.send(name)
       end
     }
   end

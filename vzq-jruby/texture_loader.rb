@@ -24,11 +24,11 @@ class TextureLoader
 end
 
 RGBAStruct = Struct.new(:r, :g, :b, :a) unless defined?(RGBAStruct)
-class RGBA < RGBAStruct
+class RGBA < RGBAStruct # TODO: to_i on members
   def to_s; '[rgba=%s,%s,%s,%s]' % [r, g, b, a]; end
   def to_java; java.awt.Color.new(r, g, b, a); end
 end
-RGBAWhite = RGBA.new(255, 255, 255, 255)
+RGBAWhite = RGBA.new(255, 255, 255, 255) unless defined?(RGBAWhite)
 
 class TextTextureDesc
   attr_accessor :text, :font_size, :color
@@ -40,15 +40,15 @@ class TextTextureDesc
   end
 end
 
-#class NoiseTextureDesc # TODO
-#  attr_accessor :size
-#  def initialize(size)
-#    @size = size
-#  end
-#  def to_s # needed for texture caching
-#    '[generated texture: type=noise size=%s]' % @size
-#  end
-#end
+class NoiseTextureDesc # TODO
+  attr_accessor :size
+  def initialize(size)
+    @size = size
+  end
+  def to_s # needed for texture caching
+    '[generated texture: type=noise size=%s]' % @size
+  end
+end
 
 class Texture
   attr_accessor :gl_id, :gl_target, :resource_name, :size, :gl_size, :gl_texture_buffer, :source_pixel_format
@@ -62,11 +62,19 @@ class Texture
 
   def reload
     t = Utils.time {
-      image = get_image
-      @size = Point2D.new(image.width, image.height)
-      @gl_size = Point2D.new(image.width.next_power_of_two, image.height.next_power_of_two)
-      @source_pixel_format = image.color_model.has_alpha ? GL11::GL_RGBA : GL11::GL_RGB
-      @gl_texture_buffer = Texture.convert_to_gl(image, gl_size)
+      case @resource_name
+      when NoiseTextureDesc
+        @size = @resource_name.size
+        @gl_size = Point2D.new(@size.x.next_power_of_two, @size.y.next_power_of_two)
+        @source_pixel_format = GL11::GL_RGBA
+        @gl_texture_buffer = Texture.draw_noise(@size, @gl_size)
+      when String, TextTextureDesc
+        image = get_image
+        @size = Point2D.new(image.width, image.height)
+        @gl_size = Point2D.new(image.width.next_power_of_two, image.height.next_power_of_two)
+        @source_pixel_format = image.color_model.has_alpha ? GL11::GL_RGBA : GL11::GL_RGB
+        @gl_texture_buffer = Texture.convert_to_gl(image, gl_size)
+      end
       remap
     }
     puts('load %s: %s ms' % [@resource_name, t])
@@ -132,10 +140,13 @@ class Texture
       g.fill_rect(0, 0, gl_size.width, gl_size.height)
       g.draw_image(image, 0, 0, nil)
       bytes = texture_image.raster.data_buffer.data
+      return convert_bytes_to_gl(bytes)
+    end
+    def convert_bytes_to_gl(bytes)
       #puts '----', (0..bytes.size-1).collect {|i| bytes[i].to_s }.join(' '), '---' if gl_size.x == 4
       gl_texture_buffer = java.nio.ByteBuffer.allocate_direct(bytes.length)
       gl_texture_buffer.order(java.nio.ByteOrder.nativeOrder)
-      gl_texture_buffer.put(bytes, 0, bytes.length)
+      gl_texture_buffer.put(bytes, 0, bytes.length) # java byte[]
       gl_texture_buffer.flip
       return gl_texture_buffer
     end
@@ -174,7 +185,6 @@ class Texture
     def draw(font_cache, desc)
       case desc
       when TextTextureDesc then draw_text(get_font(font_cache, desc.font_size), desc.text, desc.color.to_java)
-      #when NoiseTextureDesc then draw_noise(desc.size)
       else raise 'bad texture description "%s"' % desc
       end
     end
@@ -190,21 +200,25 @@ class Texture
       return image
     end
 
-#    def draw_noise(size) # too slow... TODO: do not use awt and directly write to buffer in gl format
-#      image = Jai.BufferedImage.new(size.x, size.y, Jai.BufferedImage::TYPE_INT_ARGB)
-#      h = Hash.new { |_, k| Ja.Color.new((0.1 * k).to_i, (0.25 * k).to_i, (0.6 * k).to_i, 255) }
-#      g = image.createGraphics
-#      (0..size.x-1).each { |i|
-#        (0..size.y-1).each { |j|
-#          #c = ((Math.sin(i + j * j) + 1) / 2.0)
-#          c = rand
-#          c = (c * 255).to_i
-#          g.color = h[c]
-#          g.draw_line(i, j, i, j)
-#        }
-#      }
-#      return image
-#    end
+    def draw_noise(size, gl_size) # slow... but I couldn't do faster with jruby: create a ruby string and use to_java_bytes
+      h = Array.new(256) { |i| [(0.3 * i).to_i, (0.5 * i).to_i, (0.9 * i).to_i, 255].pack('c*') }
+      bytes = '\0' * (gl_size.x * gl_size.y * 4)
+      xmax, ymax, gx = size.x.to_i-1, size.y.to_i-1, gl_size.x.to_i
+      (0..xmax).each { |i|
+        (0..ymax).each { |j|
+          c = ((Math.sin(i + j * j) + 1) * 128.0)
+          color = h[c.to_i]
+          index = (i + j * gx) * 4
+          bytes[index..index+3] = color
+        }
+      }
+      bytes = bytes.to_java_bytes
+      gl_texture_buffer = java.nio.ByteBuffer.allocate_direct(bytes.length)
+      gl_texture_buffer.order(java.nio.ByteOrder.nativeOrder)
+      gl_texture_buffer.put(bytes, 0, bytes.length) # java byte[]
+      gl_texture_buffer.flip
+      return gl_texture_buffer
+    end
   end
 end
 

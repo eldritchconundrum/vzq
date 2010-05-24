@@ -79,9 +79,10 @@ class GameBase
       if isDown
         case key
         when Keyboard::KEY_ESCAPE then @engine.games.pop
-        when Keyboard::KEY_F10 then
-          time = Utils.chrono { try_to_reload_code }
+        when Keyboard::KEY_F10
+          time = Utils.time { try_to_reload_code }
           puts("reload: %s ms" % time)
+        when Keyboard::KEY_F9 then $engine.texture_loader.reload_all
         when Keyboard::KEY_F11, Keyboard::KEY_F12
           coef = key == Keyboard::KEY_F12 ? 1.2 : (1/1.2)
           if shift then @engine.renderer.display_width *= coef else @engine.renderer.display_height *= coef end

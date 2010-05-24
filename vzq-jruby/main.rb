@@ -17,7 +17,7 @@ puts 'bootstraping runtime environment'
 
 $mtimes = {}
 def try_to_reload_code
-  (Dir['*.rb'] - ['main.rb']).sort_by { rand(3) - 1 }.each { |filename|
+  (Dir['*.rb'] - [__FILE__]).shuffle.each { |filename| # shuffle to ensure that the load order is not important
     begin
       mtime = File.mtime(filename)
       next if $mtimes[filename] == mtime
@@ -31,12 +31,12 @@ end
 
 # func for live runtime alteration
 $exec_once_hash = {}
-def exec_once(unique) # ignore exec_once that already are in the code at startup
+def exec_once(unique) # ignore exec_once blocks that already are in the code at startup
   $exec_once_hash[unique] = nil
 end
 
 # 'require', you say? real men use:
-(Dir['*.rb'] - ['main.rb']).each { |filename| load(filename) }
+(Dir['*.rb'] - [__FILE__]).each { |filename| load(filename) }
 
 def exec_once(unique)
   if !$exec_once_hash.has_key?(unique)
@@ -60,7 +60,7 @@ end
 
 if !defined?($engine)
   case $0
-  when 'main.rb' then play
+  when __FILE__ then play
   when /irb/
     puts "Welcome to the closure science enrichment interpreter. Type 'play' to play, 'quit' to quit, 'cake' to get a cake. "
     def cake; raise 'lie'; end
