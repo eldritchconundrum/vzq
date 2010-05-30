@@ -26,7 +26,7 @@ class NormalSprite
     refresh_textures
     GL11.glPushMatrix
     current_texture.bind
-    GL11.glPixelZoom(1, -1)
+#   GL11.glPixelZoom(1, -1)
     if @angle != 0
       GL11.glTranslatef(@pos.x + @size.x / 2, @pos.y + @size.y / 2, 0)
       GL11.glRotatef(@angle, 0, 0, 1) if (@angle != 0) # angle is relative to center of sprite
@@ -43,7 +43,7 @@ class NormalSprite
   end
 end
 
-# TODO: support type of collision detection, customize bounds, center of sprite, distance-based, etc.
+# TODO: support different types of collision detection, customize bounds, center of sprite, distance-based, etc.
 class CollisionDetector # works only with rectangles, does not support rotation
   def initialize(entities) # items in list need to have 'pos' and 'size'
     @rects = {}
@@ -89,6 +89,7 @@ class GameBase
         when Keyboard::KEY_F1 then require 'debug' # works only once, don't use 'c'.   #require 'rubygems'; require 'ruby-debug'; debugger
         when Keyboard::KEY_F then $engine.renderer.fullscreen ^= true if ctrl
         when Keyboard::KEY_Q then $engine.games.clear if ctrl
+        when Keyboard::KEY_F3 then $engine.play(DebugMenuScreen.new)
         end
       end
     }
@@ -116,7 +117,6 @@ class MenuScreen < GameBase
       if isDown
         case key
         when Keyboard::KEY_SPACE then $engine.play(ShootEmUp.new)
-        when Keyboard::KEY_F3 then $engine.play(DebugMenuScreen.new)
         end
       end
     }
@@ -127,6 +127,9 @@ end
 # généraliser système de log régulier, permettre de log dans fichier plutot pour pas pourrir irb,
 # faire un vrai menu qui a une bonne tete
 # faire une classe pour aider à l'écriture de texte à l'écran ?
+# avoir un temps écoulé qui ne soit pas affecté par la pause ou par le passage par des @games intermédiaires (menu..)
+# fix "pause" mode : implémenter via un @games ? faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
+
 
 class DebugMenuScreen < GameBase
   def initialize

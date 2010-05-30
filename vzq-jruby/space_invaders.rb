@@ -43,7 +43,6 @@ class Background < Entity
     @sprites.each { |s| s.z_order = -1 }
   end
   def sprites
-    #return []
     @movement.y = ShootEmUpConfig.background_speed
     @sprites[0].pos = @pos
     @sprites[1].pos = @pos.clone
@@ -112,7 +111,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     @can_fire2_wait = ElapsedTimeWait.new { ShootEmUpConfig.fire_rate * 50 }
     @fire_spread_change_wait = ElapsedTimeWait.new { ShootEmUpConfig.fire_rate }
     # use wait_manager to trigger game events at regular intervals (in no particular order)
-    @wait_manager.add(:log_entities) { 1000 }
+    @wait_manager.add(:log_entities) { 2000 }
     @wait_manager.add(:add_random_aliens) { 1000 }
     @wait_manager.add(:animate_alien_sprites) { ShootEmUpConfig.alien_frame_duration }
     @wait_manager.add(:make_aliens_fire) { ShootEmUpConfig.alien_fire_rate }
