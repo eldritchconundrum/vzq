@@ -71,6 +71,9 @@ class Utils
       yield
       get_time - start
     end
+    def array_from_varargs(array)
+      array.size == 1 && array.first.is_a?(Array) ? array.first : array
+    end
   end
 end
 
@@ -90,7 +93,11 @@ class WaitManager
       interval = @interval_funcs[name].call # only call them again on code reload?
       if last_time + interval <= now
         @last_times[name] = now
-        @target.send(name)
+        begin
+          @target.send(name)
+        rescue NoMethodError
+          puts "event manager: #{$!}"
+        end
       end
     }
   end

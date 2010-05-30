@@ -51,7 +51,7 @@ def init
 end
 def play
   init
-  $engine.play(MenuScreen.new($engine))
+  $engine.play(MenuScreen.new)
 end
 def stop
   $engine.destroy

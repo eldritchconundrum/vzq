@@ -53,7 +53,9 @@ class Background < Entity
   end
 end
 
-# searching the list everytime makes 'tagged' slow, so use hash tables to keep entities by tags
+# optimization. I could use a list, but
+# searching everytime makes 'tagged' slow, so use hash tables to keep entities indexed by tags
+# 'tagged' is called every frame, 'entities add/remove' are not.
 class EntitiesSet
   include Enumerable # uses 'each'
   def initialize
@@ -63,8 +65,8 @@ class EntitiesSet
   def size; @list.size; end
   def <<(arg); add(arg); end
   def <<(arg); add(arg); end
-  def add(arg); (arg.is_a?(Array) ? arg : [arg]).each { |item| add_internal(item) }; end
-  def remove(arg); (arg.is_a?(Array) ? arg : [arg]).each { |item| remove_internal(item) }; end
+  def add(*arg); arg = Utils.array_from_varargs(arg); arg.each { |item| add_internal(item) }; end
+  def remove(*arg); arg = Utils.array_from_varargs(arg); arg.each { |item| remove_internal(item) }; end
   def each(*args, &block); @list.each(*args, &block); end
   def tagged(*tags) # tagged(:alien, :boss) returns entities tagged :alien or :boss or both
     @lists_by_tag_list[tags].clone
@@ -98,9 +100,8 @@ end
 class GameBase; end # forward decl for reloading
 class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up pause and autoplay
   attr_accessor :entities
-  def initialize(engine)
+  def initialize
     super()
-    @engine = engine
     @entities = EntitiesSet.new
     @frame_count = 0
     @paused = false
@@ -130,15 +131,28 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 # TODO : HUD with life, life bonus, other ascii art sprites
 # sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
 # tirs qui tournent : § % * # ﬅ € @ •
+# J: tir qui s'upgrade petit à petit (1..5)
+
+# mode ikaruga
+# shoot spread variation
+# profiling bug on windows
+# nanowar
+# resolution change
+# sound
+# menu générique de débug
+# tester ruby-debug
+# find a way to load textures in the background (threads and GL could not mix well))
+# collision detection: distance à un point au centre (tester jouabilité et comparer perfs)
+# trier TODO
 
   private
 
   def init_state
     add_ship
-    # @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite(['bg_moon.jpg']) }).with(:tags => [:background])
-    @entities << Background.new(Point2D.new(0, 0), lambda {
-                                  get_sprite([NoiseTextureDesc.new(Point2D.new(400, 300))])
-                                }).with(:tags => [:background])
+     @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite('bg_moon.jpg') }).with(:tags => [:background])
+#    @entities << Background.new(Point2D.new(0, 0), lambda {
+#                                  get_sprite(NoiseTextureDesc.new(Point2D.new(400, 300)))
+#                                }).with(:tags => [:background])
   end
 
   # --- WaitManager events begin ---
@@ -171,7 +185,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     @entities.tagged(:alien).each { |alien|
       next if rand > 0.01
       create_shot = proc { |damage, speed, angle, char, tag|
-        Shot.new(get_sprite([TextTextureDesc.new(char, 32, RGBA.new(0, 255, 255, 255))]).with(:center => alien.pos + alien.size / 2),
+        Shot.new(get_sprite(TextTextureDesc.new(char, 32, RGBA[0, 255, 255, 255])).with(:center => alien.pos + alien.size / 2),
                  Point2D.new(speed * Math.cos(angle), speed * Math.sin(angle))
                  ).with(:damage => damage, :tags => [:shot, :enemy_shot, :rotating] + (tag.nil? ? [] : [tag]))
       }
@@ -195,19 +209,16 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def add_bonus
     return if !@tir_pourri
     direction = rand < 0.5
-    @entities << Entity.new(get_sprite([TextTextureDesc.new('$', 24, RGBA.new(255, 128, 255, 255))]).
+    @entities << Entity.new(get_sprite(TextTextureDesc.new('$', 24, RGBA[255, 128, 255, 255])).
                             with(:center => Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)),
                             Point2D.new((direction ? 1 : -1) * ShootEmUpConfig.ship_move_speed, 0)).with(:tags => [:bonus])
   end
 
   # --- WaitManager events end ---
 
-  def get_sprite(resource_names)
-    NormalSprite.new { resource_names.collect{ |r| @engine.texture_loader.get(r) } }
-  end
   def get_new_alien(pos, movement, is_boss = false)
     alien_anim = ['spaceinvaders/alien.gif', 'spaceinvaders/alien2.gif', 'spaceinvaders/alien.gif', 'spaceinvaders/alien3.gif']
-    alien = Entity.new(get_sprite(alien_anim).with(:center => pos), movement).with(:life => 25, :tags => is_boss ? [:alien, :boss] : [:alien])
+    alien = Entity.new(get_sprite(*alien_anim).with(:center => pos), movement).with(:life => 25, :tags => is_boss ? [:alien, :boss] : [:alien])
     # stocker la fonction-trajectoire (faire une classe pour ça ?)
     if is_boss
       alien.sprites.first.zoom = 2.0
@@ -218,7 +229,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   end
   def add_ship
     @tir_pourri = true
-    @entities << Entity.new(get_sprite(['spaceinvaders/ship.gif']).with(:center => Point2D.new(400, 500))).with(:life => 100, :tags => [:ship])
+    @entities << Entity.new(get_sprite('spaceinvaders/ship.gif').with(:center => Point2D.new(400, 500))).with(:life => 100, :tags => [:ship])
   end
 
   def process_input
@@ -297,9 +308,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     @frame_count += 1
 
     $p[:colli] += Utils.time { process_collisions(delta) }
-
     $p[:events] += Utils.time { @wait_manager.run_events }
-
     $p[:misc] += Utils.time {
       if !@paused || @autoplay
         # process player actions
@@ -314,7 +323,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
         if player_actions.fire_pressed && @can_fire_wait.is_over_auto_reset
           @fire_spread = 1 - @fire_spread if @fire_spread_change_wait.is_over_auto_reset
           @entities.tagged(:ship).each { |ship|
-            new_shot_spr = lambda { |dp| get_sprite(['spaceinvaders/shot.gif']).with(:center => ship.pos + dp) }
+            new_shot_spr = lambda { |dp| get_sprite('spaceinvaders/shot.gif').with(:center => ship.pos + dp) }
             speed = -1.1 * ShootEmUpConfig.ship_move_speed
             shots = []
             case @fire_spread
@@ -336,9 +345,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
           @last_fire2_time = Utils.get_time
           damage = 1.2 * multiplier # gameplay: must be just less than enough to kill a simple alien
           @entities.tagged(:ship).each { |ship|
-            # sly chars : ﻿★☆ȸȹɅϞϟ༄༅༗།༎༒༓༔࿂ ࿃ ࿄  ࿅࿆࿇ ࿈࿉ ࿊ ࿋ ࿌✌
-            desc = TextTextureDesc.new('@', 32 * (1 + Math.log(multiplier)), RGBA.new(255, 255, 0, 255))
-            sprite = get_sprite([desc]).with(:center => ship.pos + Point2D.new(ship.size.x*0.5, 0))
+            # sly chars : ★☆ȸȹɅϞϟ༄༅༗།༎༒༓༔࿂ ࿃ ࿄  ࿅࿆࿇ ࿈࿉ ࿊ ࿋ ࿌✌
+            desc = TextTextureDesc.new('@', 32 * (1 + Math.log(multiplier)), RGBA[255, 255, 0, 255])
+            sprite = get_sprite(desc).with(:center => ship.pos + Point2D.new(ship.size.x*0.5, 0))
             @entities << Shot.new(sprite, Point2D.new(0, -10)).with(:damage => damage,
                                                                     :tags => [:shot, :arrobase_shot, :player_shot, :rotating, :permanent_shot])
           }
@@ -368,6 +377,6 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     # draw sprites
     @entities.collect { |e| e.sprites }.flatten.sort_by { |sprite| sprite.z_order }.each { |sprite| sprite.draw }
     # with pause text on top
-    get_sprite([TextTextureDesc.new(@autoplay ? '-- paused (autoplay) --' : '-- paused --', 32)]).with(:center => EngineConfig.ortho / 2).draw if @paused
+    get_sprite(TextTextureDesc.new(@autoplay ? '-- paused (autoplay) --' : '-- paused --', 32)).with(:center => EngineConfig.ortho / 2).draw if @paused
   end
 end

@@ -27,8 +27,9 @@ RGBAStruct = Struct.new(:r, :g, :b, :a) unless defined?(RGBAStruct)
 class RGBA < RGBAStruct # TODO: to_i on members
   def to_s; '[rgba=%s,%s,%s,%s]' % [r, g, b, a]; end
   def to_java; java.awt.Color.new(r, g, b, a); end
+  def [](r, g, b, a); RGBA.new(r.to_i, g.to_i, b.to_i, a.to_i); end
 end
-RGBAWhite = RGBA.new(255, 255, 255, 255) unless defined?(RGBAWhite)
+RGBAWhite = RGBA[255, 255, 255, 255] unless defined?(RGBAWhite)
 
 class TextTextureDesc
   attr_accessor :text, :font_size, :color
@@ -36,7 +37,7 @@ class TextTextureDesc
     @text, @font_size, @color = text, font_size, color
   end
   def to_s # needed for texture caching
-    '[generated texture font_size=%s text=%s, color=%s]' % [@font_size, @text.inspect, @color]
+    '[generated texture: type=text font_size=%s text=%s, color=%s]' % [@font_size, @text.inspect, @color]
   end
 end
 
@@ -74,6 +75,8 @@ class Texture
         @gl_size = Point2D.new(image.width.next_power_of_two, image.height.next_power_of_two)
         @source_pixel_format = image.color_model.has_alpha ? GL11::GL_RGBA : GL11::GL_RGB
         @gl_texture_buffer = Texture.convert_to_gl(image, gl_size)
+      else
+        raise ArgumentError.new("unknown resource. #{@resource_name.class} : #{@resource_name}") # arg error that prints the arg
       end
       remap
     }
@@ -107,7 +110,7 @@ class Texture
   end
 
   def to_s
-    "[texture%s w,h=%s (%sx%s) %s]" % [gl_id, size, textureWidth, textureHeight, resourceName]
+    "[texture%s w,h=%s (%s) %s]" % [@gl_id, @size, @gl_size, @resource_name]
   end
 
   private
@@ -213,11 +216,7 @@ class Texture
         }
       }
       bytes = bytes.to_java_bytes
-      gl_texture_buffer = java.nio.ByteBuffer.allocate_direct(bytes.length)
-      gl_texture_buffer.order(java.nio.ByteOrder.nativeOrder)
-      gl_texture_buffer.put(bytes, 0, bytes.length) # java byte[]
-      gl_texture_buffer.flip
-      return gl_texture_buffer
+      return convert_bytes_to_gl(bytes)
     end
   end
 end

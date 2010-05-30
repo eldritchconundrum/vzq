@@ -78,31 +78,34 @@ class GameBase
     keyboard_events.each { |char, isDown, key|
       if isDown
         case key
-        when Keyboard::KEY_ESCAPE then @engine.games.pop
+        when Keyboard::KEY_ESCAPE then $engine.games.pop
         when Keyboard::KEY_F10
           time = Utils.time { try_to_reload_code }
           puts("reload: %s ms" % time)
         when Keyboard::KEY_F9 then $engine.texture_loader.reload_all
         when Keyboard::KEY_F11, Keyboard::KEY_F12
           coef = key == Keyboard::KEY_F12 ? 1.2 : (1/1.2)
-          if shift then @engine.renderer.display_width *= coef else @engine.renderer.display_height *= coef end
-        when Keyboard::KEY_F then @engine.renderer.fullscreen ^= true if ctrl
-        when Keyboard::KEY_Q then @engine.games.clear if ctrl
+          if shift then $engine.renderer.display_width *= coef else $engine.renderer.display_height *= coef end
+        when Keyboard::KEY_F1 then require 'debug' # works only once, don't use 'c'.   #require 'rubygems'; require 'ruby-debug'; debugger
+        when Keyboard::KEY_F then $engine.renderer.fullscreen ^= true if ctrl
+        when Keyboard::KEY_Q then $engine.games.clear if ctrl
         end
       end
     }
     return keyboard_events # for overrides
   end
+  def get_sprite(*resource_names)
+    NormalSprite.new { resource_names.collect{ |r| $engine.texture_loader.get(r) } }
+  end
 end
 
 
 class MenuScreen < GameBase
-  def initialize(engine)
+  def initialize
     super()
-    @engine = engine
-    @txt_sprite = NormalSprite.new { [@engine.texture_loader.get(TextTextureDesc.new('use arrows and space', 32))] }.with(:pos => Point2D.new(200, 300))
   end
   def nextFrame(isDisplayActive, delta)
+    @txt_sprite = get_sprite(TextTextureDesc.new('use arrows and space', 32)).with(:pos => Point2D.new(200, 300))
     @txt_sprite.draw
     process_input
   end
@@ -112,7 +115,43 @@ class MenuScreen < GameBase
     keyboard_events.each { |char, isDown, key|
       if isDown
         case key
-        when Keyboard::KEY_SPACE then @engine.play(ShootEmUp.new(@engine))
+        when Keyboard::KEY_SPACE then $engine.play(ShootEmUp.new)
+        when Keyboard::KEY_F3 then $engine.play(DebugMenuScreen.new)
+        end
+      end
+    }
+  end
+end
+
+# TODO: refaire la répartition des keyboard events, ne pas mettre trop de commandes de debug dans gamebase
+# généraliser système de log régulier, permettre de log dans fichier plutot pour pas pourrir irb,
+# faire un vrai menu qui a une bonne tete
+# faire une classe pour aider à l'écriture de texte à l'écran ?
+
+class DebugMenuScreen < GameBase
+  def initialize
+    super()
+    @wait_manager.add(:log) { 2000 }
+  end
+  def write(text, y)
+    get_sprite(TextTextureDesc.new(text, 16)).with(:center => Point2D.new(EngineConfig.ortho.x / 2, y)).draw
+  end
+  def nextFrame(isDisplayActive, delta)
+    write('F9 to reload all loaded gl textures', 300)
+    write('F4 to clear the cache of gl textures', 350)
+    @wait_manager.run_events
+    process_input
+  end
+  private
+  def log
+    $engine.texture_loader.instance_eval('puts(@cache.values)')
+  end
+  def process_input
+    keyboard_events = super
+    keyboard_events.each { |char, isDown, key|
+      if isDown
+        case key
+        when Keyboard::KEY_F4 then $engine.texture_loader.clear
         end
       end
     }

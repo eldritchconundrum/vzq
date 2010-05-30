@@ -3,8 +3,8 @@ class EngineConfig
     def reload_code_wait_in_ms; 1000; end # ms ; -1 disables
     def resource_root; 'res/'; end
     def default_display_frequency; $VERBOSE && debug ? -1 : 60; end # -1 or > 0
-    def show_fps_hook(engine, fps)
-      engine.renderer.title = '%s FPS | Welcome to the eldritch realm of VZQ' % fps
+    def show_fps_hook(fps)
+      $engine.renderer.title = '%s FPS | Welcome to the eldritch realm of VZQ' % fps
       puts("FPS: %s" % fps)
     end
     def ortho; Point2D.new(800, 600); end
@@ -22,7 +22,7 @@ class GameEngine
   attr_accessor :renderer, :texture_loader, :games
   def initialize
     @texture_loader = TextureLoader.new
-    @renderer = Renderer.new(self)
+    @renderer = Renderer.new
     @reload_code_wait = ElapsedTimeWait.new { EngineConfig.reload_code_wait_in_ms }
     @games = [] # stack
   end
@@ -94,10 +94,9 @@ class Renderer
     GL11.glViewport(0, 0, @display_width, @display_height) # un viewport c'est un rect dans lequel on va dessiner
     GL11.glBlendFunc(GL11::GL_SRC_ALPHA, GL11::GL_ONE_MINUS_SRC_ALPHA) # tester d'autres ?
     puts("bpp=%s" % Display.getDisplayMode.getBitsPerPixel)
-    @engine.texture_loader.remap_all_textures
+    $engine.texture_loader.remap_all_textures if defined?($engine)
   end
-  def initialize(engine)
-    @engine = engine
+  def initialize
     @display_frequency = EngineConfig.default_display_frequency
     @display_width, @display_height = 800, 600
     @fpsCounter = FpsCounter.new
@@ -105,7 +104,7 @@ class Renderer
     reset_screen
   end
   def destroy
-    @engine.texture_loader.destroy
+    $engine.texture_loader.destroy
     Display.destroy
   end
   def renderFrame(game)
@@ -117,10 +116,10 @@ class Renderer
     Display.sync(@display_frequency) if (@display_frequency > 0)
     now = Utils.get_time
     delta, @last_loop_time = (now - @last_loop_time).to_i, now
-    @fpsCounter.step(delta) { |fps| EngineConfig.show_fps_hook(@engine, fps) }
+    @fpsCounter.step(delta) { |fps| EngineConfig.show_fps_hook(fps) }
     game.nextFrame(Display.isActive, delta)
     Display.update
-    @engine.games = [] if Display.is_close_requested?
+    $engine.games = [] if Display.is_close_requested?
   end
 end
 
