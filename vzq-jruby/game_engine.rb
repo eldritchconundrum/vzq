@@ -1,9 +1,3 @@
-
-exec_once('dfcffgjbojgffnopuiaopzoopffdg') {
-  $engine.texture_loader.reload_all
-  puts 'test'
-}
-
 class GameEngine
   attr_accessor :renderer, :texture_loader, :games
   def initialize

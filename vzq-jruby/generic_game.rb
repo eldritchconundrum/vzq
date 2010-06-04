@@ -66,7 +66,9 @@ class GameBase
     @wait_manager = WaitManager.new(self)
   end
   def nextFrame(isDisplayActive, delta)
+    # override this to call process_input and render
   end
+
   def process_input # general key bindings
     keyboard_events = []
     Keyboard.poll
@@ -76,25 +78,29 @@ class GameBase
     ctrl = [Keyboard::KEY_RCONTROL, Keyboard::KEY_LCONTROL].any?{|k| Keyboard.isKeyDown(k) }
     shift = [Keyboard::KEY_RSHIFT, Keyboard::KEY_LSHIFT].any?{|k| Keyboard.isKeyDown(k) }
     keyboard_events.each { |char, isDown, key|
-      if isDown
-        case key
-        when Keyboard::KEY_ESCAPE then $engine.games.pop
-        when Keyboard::KEY_F10
-          time = Utils.time { try_to_reload_code }
-          puts("reload: %s ms" % time)
-        when Keyboard::KEY_F9 then $engine.texture_loader.reload_all
-        when Keyboard::KEY_F11, Keyboard::KEY_F12
-          coef = key == Keyboard::KEY_F12 ? 1.2 : (1/1.2)
-          if shift then $engine.renderer.display_width *= coef else $engine.renderer.display_height *= coef end
-        when Keyboard::KEY_F1 then require 'debug' # works only once, don't use 'c'.   #require 'rubygems'; require 'ruby-debug'; debugger
-        when Keyboard::KEY_F then $engine.renderer.fullscreen ^= true if ctrl
-        when Keyboard::KEY_Q then $engine.games.clear if ctrl
-        when Keyboard::KEY_F3 then $engine.play(DebugMenuScreen.new)
-        end
-      end
+      process_input_simple(ctrl, shift, key) if isDown
     }
     return keyboard_events # for overrides
   end
+
+  def process_input_simple(ctrl, shift, key)
+    case key
+    when Keyboard::KEY_ESCAPE then $engine.games.pop
+    when Keyboard::KEY_F9 then $engine.texture_loader.reload_all
+    when Keyboard::KEY_F10
+      time = Utils.time { try_to_reload_code }
+      puts("reload: %s ms" % time)
+    when Keyboard::KEY_F11, Keyboard::KEY_F12
+      coef = key == Keyboard::KEY_F12 ? 1.2 : (1/1.2)
+      if shift then $engine.renderer.display_width *= coef else $engine.renderer.display_height *= coef end
+    when Keyboard::KEY_F1 then require 'debug' # works only once, don't use 'c'.   #require 'rubygems'; require 'ruby-debug'; debugger
+    when Keyboard::KEY_F2 then raise 'user-triggered exception'
+    when Keyboard::KEY_F then $engine.renderer.fullscreen ^= true if ctrl
+    when Keyboard::KEY_Q then $engine.games.clear if ctrl
+    when Keyboard::KEY_F3 then $engine.play(DebugMenuScreen.new)
+    end
+  end
+
   def get_sprite(*resource_names)
     NormalSprite.new { resource_names.collect{ |r| $engine.texture_loader.get(r) } }
   end
@@ -108,28 +114,33 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
   def write(text, pos, size = 16)
     get_sprite(TextTextureDesc.new(text, size)).with(:pos => pos).draw
   end
+  def write_list(list, pos_lambda)
+    list.each_with_index { |item, i| write(item, pos_lambda.call(i)) }
+  end
   def nextFrame(isDisplayActive, delta)
     write(@exception.class, Point2D.new(150, 20), 24)
     write(@exception, Point2D.new(20, 70))
-    e = $engine.games.count { |g| g.is_a?(ErrorGame) }
-    write("#{e} total current errors in 'game' stack.", Point2D.new(450, 30), 12)
-    @exception.backtrace[0..15].each_with_index { |line, i|
-      write(line, Point2D.new(20, 120 + i * 20))
-    }
     if @extended
+      write_list(@exception.backtrace, lambda { |i| Point2D.new(20, 120 + i * 20) })
+      write_list($engine.games.reverse, lambda { |i| Point2D.new(420, 20 + i * 20) })
+    else
+      write('extended error mode failed, falling back to simple', Point2D.new(300, 300))
     end
     process_input
   end
   private
-  def process_input
-    keyboard_events = super
-    keyboard_events.each { |char, isDown, key|
-      if isDown
-        case key
-        when Keyboard::KEY_K then 2.times { $engine.games.pop } # this and the preceding
-        end
+  def process_input_simple(ctrl, shift, key)
+    case key
+    when Keyboard::KEY_SPACE then $engine.games.pop # resume next :)
+    when Keyboard::KEY_K then 2.times { $engine.games.pop } # kill the crashing game
+    when Keyboard::KEY_R then # try to restart the crashing game if supported
+      if $engine.games[-2].respond_to?(:start_new)
+        $engine.games.pop
+        crashed = $engine.games.pop
+        $engine.games << crashed.start_new
       end
-    }
+    else super(ctrl, shift, key)
+    end
   end
 end
 
@@ -143,15 +154,11 @@ class MenuScreen < GameBase
     process_input
   end
   private
-  def process_input
-    keyboard_events = super
-    keyboard_events.each { |char, isDown, key|
-      if isDown
-        case key
-        when Keyboard::KEY_SPACE then $engine.play(ShootEmUp.new)
-        end
-      end
-    }
+  def process_input_simple(ctrl, shift, key)
+    case key
+    when Keyboard::KEY_SPACE then $engine.play(ShootEmUp.new)
+    else super(ctrl, shift, key)
+    end
   end
 end
 
@@ -163,7 +170,7 @@ end
 # fix "pause" mode : implémenter via un @games ? faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
 
 
-class DebugMenuScreen < GameBase
+class DebugMenuScreen < GameBase # TODO: j'ai besoin d'avoir une IHM pour eval, dans ce truc !
   def initialize
     super()
     @wait_manager.add(:log) { 2000 }
@@ -181,14 +188,10 @@ class DebugMenuScreen < GameBase
   def log
     $engine.texture_loader.instance_eval('puts(@cache.values)')
   end
-  def process_input
-    keyboard_events = super
-    keyboard_events.each { |char, isDown, key|
-      if isDown
-        case key
-        when Keyboard::KEY_F4 then $engine.texture_loader.clear
-        end
-      end
-    }
+  def process_input_simple(ctrl, shift, key)
+    case key
+    when Keyboard::KEY_F4 then $engine.texture_loader.clear
+    else super(ctrl, shift, key)
+    end
   end
 end
