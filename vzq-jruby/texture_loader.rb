@@ -187,7 +187,7 @@ class Texture
 
     def draw(font_cache, desc)
       case desc
-      when TextTextureDesc then draw_text(get_font(font_cache, desc.font_size), desc.text, desc.color.to_java)
+      when TextTextureDesc then draw_text(get_font(font_cache, desc.font_size), desc.text.to_s, desc.color.to_java)
       else raise 'bad texture description "%s"' % desc
       end
     end

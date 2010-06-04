@@ -100,6 +100,38 @@ class GameBase
   end
 end
 
+class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
+  def initialize(exception)
+    @exception = exception
+    @extended = !$engine.games[-2].is_a?(ErrorGame) # limit ourselves to very simple error reporting if the exception comes from this class
+  end
+  def write(text, pos, size = 16)
+    get_sprite(TextTextureDesc.new(text, size)).with(:pos => pos).draw
+  end
+  def nextFrame(isDisplayActive, delta)
+    write(@exception.class, Point2D.new(150, 20), 24)
+    write(@exception, Point2D.new(20, 70))
+    e = $engine.games.count { |g| g.is_a?(ErrorGame) }
+    write("#{e} total current errors in 'game' stack.", Point2D.new(450, 30), 12)
+    @exception.backtrace[0..15].each_with_index { |line, i|
+      write(line, Point2D.new(20, 120 + i * 20))
+    }
+    if @extended
+    end
+    process_input
+  end
+  private
+  def process_input
+    keyboard_events = super
+    keyboard_events.each { |char, isDown, key|
+      if isDown
+        case key
+        when Keyboard::KEY_K then 2.times { $engine.games.pop } # this and the preceding
+        end
+      end
+    }
+  end
+end
 
 class MenuScreen < GameBase
   def initialize

@@ -1,17 +1,3 @@
-class EngineConfig
-  class << self
-    def reload_code_wait_in_ms; 1000; end # ms ; -1 disables
-    def resource_root; 'res/'; end
-    def default_display_frequency; $VERBOSE && debug ? -1 : 60; end # -1 or > 0
-    def show_fps_hook(fps)
-      $engine.renderer.title = '%s FPS | Welcome to the eldritch realm of VZQ' % fps
-      puts("FPS: %s" % fps)
-    end
-    def ortho; Point2D.new(800, 600); end
-    def debug_sprite_box(desc); false && EngineConfig.debug; end
-    def debug; true; end
-  end
-end
 
 exec_once('dfcffgjbojgffnopuiaopzoopffdg') {
   $engine.texture_loader.reload_all
@@ -33,10 +19,16 @@ class GameEngine
     end
   end
   def mainloop
-    @renderer.renderFrame(@games.last)
-    if @reload_code_wait.is_over_auto_reset
-      time = Utils.time { try_to_reload_code }
-      puts("- reload: %s ms" % time)
+    begin
+      @renderer.renderFrame(@games.last)
+      if @reload_code_wait.is_over_auto_reset
+        time = Utils.time { try_to_reload_code }
+        puts("- reload: %s ms" % time)
+      end
+    rescue
+      raise unless EngineConfig.debug
+      puts 'exception at toplevel:', $!, $!.backtrace
+      play(ErrorGame.new($!))
     end
   end
   def destroy

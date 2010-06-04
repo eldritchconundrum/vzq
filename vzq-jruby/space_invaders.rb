@@ -1,14 +1,3 @@
-class ShootEmUpConfig
-  class << self
-    def alien_frame_duration; 200; end # in ms
-    def background_speed; 5; end
-    def fire_rate; 50; end # do not set it to a too small value (near the FPS) or it will be messed up (slower rate) (TODO: fix)
-    def alien_fire_rate; 100; end
-    def ship_move_speed; 40; end
-    def bonus_wait; 8000; end
-  end
-end
-
 # BUG: collision detection does not support the zoom factor; also, don't check the sprite rectangle, just check a small circle around the center
 
 # Entities add some game logic to sprites
@@ -29,6 +18,9 @@ class Entity
   def dead?; @life <= 0; end
   def to_s; "[%s]" % tags; end
 end
+
+# idée : jouer deux vaisseaux dans 2 moitiés d'écran en synchronisé
+# (ce serait ça le gameplay du jeu) avec des tirs différents à éviter dans chaque
 
 class Shot < Entity
   attr_accessor :damage # TODO: separate two different types of damage, once, and 'over time' for shots that do not disappear after damaging
@@ -96,6 +88,16 @@ $p = Hash.new(0) # time profiling (ms)
 class Trajectoire # ça se dit comment en anglais d'ailleurs ?
 end
 
+class PlayerInfo
+  attr_accessor :spread_level
+  def initialize
+    reset
+  end
+  def reset
+    @spread_level = 1
+  end
+end
+
 class GameBase; end # forward decl for reloading
 class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up pause and autoplay
   attr_accessor :entities
@@ -116,6 +118,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     @wait_manager.add(:animate_alien_sprites) { ShootEmUpConfig.alien_frame_duration }
     @wait_manager.add(:make_aliens_fire) { ShootEmUpConfig.alien_fire_rate }
     @wait_manager.add(:add_bonus) { ShootEmUpConfig.bonus_wait }
+    @player = PlayerInfo.new
     init_state
   end
 
@@ -130,7 +133,6 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 # TODO : HUD with life, life bonus, other ascii art sprites
 # sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
 # tirs qui tournent : § % * # ﬅ € @ •
-# J: tir qui s'upgrade petit à petit (1..5)
 
 # mode ikaruga
 # shoot spread variation
@@ -148,7 +150,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 
   def init_state
     add_ship
-     @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite('bg_moon.jpg') }).with(:tags => [:background])
+     @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite(ShootEmUpConfig.bg_moon) }).with(:tags => [:background])
 #    @entities << Background.new(Point2D.new(0, 0), lambda {
 #                                  get_sprite(NoiseTextureDesc.new(Point2D.new(400, 300)))
 #                                }).with(:tags => [:background])
@@ -206,7 +208,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   end
 
   def add_bonus
-    return if !@tir_pourri
+    return if @player.spread_level >= 5
     direction = rand < 0.5
     @entities << Entity.new(get_sprite(TextTextureDesc.new('$', 24, RGBA[255, 128, 255, 255])).
                             with(:center => Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)),
@@ -216,8 +218,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   # --- WaitManager events end ---
 
   def get_new_alien(pos, movement, is_boss = false)
-    alien_anim = ['spaceinvaders/alien.gif', 'spaceinvaders/alien2.gif', 'spaceinvaders/alien.gif', 'spaceinvaders/alien3.gif']
-    alien = Entity.new(get_sprite(*alien_anim).with(:center => pos), movement).with(:life => 25, :tags => is_boss ? [:alien, :boss] : [:alien])
+    alien = Entity.new(get_sprite(*ShootEmUpConfig.alien_anim).with(:center => pos), movement).with(:life => 25, :tags => is_boss ? [:alien, :boss] : [:alien])
     # stocker la fonction-trajectoire (faire une classe pour ça ?)
     if is_boss
       alien.sprites.first.zoom = 2.0
@@ -227,8 +228,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     return alien
   end
   def add_ship
-    @tir_pourri = true
-    @entities << Entity.new(get_sprite('spaceinvaders/ship.gif').with(:center => Point2D.new(400, 500))).with(:life => 100, :tags => [:ship])
+    @entities << Entity.new(get_sprite(ShootEmUpConfig.sprite_ship).with(:center => Point2D.new(400, 500))).with(:life => 100, :tags => [:ship])
   end
 
   def process_input
@@ -294,7 +294,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
       alien.life -= damage
     }
     cd.test(@entities.tagged(:ship), @entities.tagged(:bonus)) { |ship, bonus|
-      @tir_pourri = false # TODO: per ship
+      @player.spread_level += 1
       @entities.remove(bonus)
     }
     cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:arrobase_shot)) { |enemy_shot, arrobase_shot|
@@ -322,17 +322,17 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
         if player_actions.fire_pressed && @can_fire_wait.is_over_auto_reset
           @fire_spread = 1 - @fire_spread if @fire_spread_change_wait.is_over_auto_reset
           @entities.tagged(:ship).each { |ship|
-            new_shot_spr = lambda { |dp| get_sprite('spaceinvaders/shot.gif').with(:center => ship.pos + dp) }
+            new_shot_spr = lambda { |dp| get_sprite(ShootEmUpConfig.sprite_shot).with(:center => ship.pos + dp) }
             speed = -1.1 * ShootEmUpConfig.ship_move_speed
             shots = []
             case @fire_spread
             when 0
-              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 0)), Point2D.new(0, speed))
-              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 10)), Point2D.new(-7, speed)) unless @tir_pourri
-              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 10)), Point2D.new(7, speed)) unless @tir_pourri
+              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 0)), Point2D.new(0, speed)) if @player.spread_level % 2 == 1
+              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 10)), Point2D.new(-7, speed)) if @player.spread_level / 2 >= 2
+              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 10)), Point2D.new(7, speed)) if @player.spread_level / 2 >= 2
             when 1
-              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 5)), Point2D.new(-3, speed))
-              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 5)), Point2D.new(3, speed))
+              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 5)), Point2D.new(-3, speed)) if @player.spread_level / 2 >= 1
+              shots << Shot.new(new_shot_spr.call(Point2D.new(ship.size.x*0.5, 5)), Point2D.new(3, speed)) if @player.spread_level / 2 >= 1
             end
             shots.each { |shot| shot.with(:damage => 5, :tags => [:shot, :player_shot])
             }
