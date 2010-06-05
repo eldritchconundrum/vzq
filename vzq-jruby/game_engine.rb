@@ -6,11 +6,13 @@ class GameEngine
     @reload_code_wait = ElapsedTimeWait.new { EngineConfig.reload_code_wait_in_ms }
     @games = [] # stack
   end
-  def play(game)
-    @games.push(game)
-    until @games.empty?
-      mainloop
+  def start
+    e = [nil] * 10
+    until @games.empty? || e.all? { |x| !x.nil? }
+      e.shift
+      e << mainloop
     end
+    puts "can't seem to recover from errors. quitting" if !@games.empty?
   end
   def mainloop
     begin
@@ -19,10 +21,11 @@ class GameEngine
         time = Utils.time { try_to_reload_code }
         puts("- reload: %s ms" % time)
       end
+      return nil
     rescue
-      raise unless EngineConfig.debug
-      puts 'exception at toplevel:', $!, $!.backtrace
-      play(ErrorGame.new($!))
+      puts 'exception caught at main loop:', $!, $!.backtrace[0..100]
+      @games << (EngineConfig.debug ? ErrorGame.new($!) : ErrorGame.new($!)) # TODO: when not in debug, intermediate screen asking if switch to debug mode or abandon ?
+      return $!
     end
   end
   def destroy

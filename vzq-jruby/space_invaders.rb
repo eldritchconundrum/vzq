@@ -145,7 +145,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     init_state
   end
 
-  def start_new
+  def start_new # trouver un moyen que cette fonction soit créée toute seule (en repassant les params du ctor)
     self.class.new
   end
 
@@ -186,7 +186,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   # --- WaitManager events begin ---
   def log_entities
     if $VERBOSE
-      puts('  ' + $p.map{ |k,v| "#{k}=#{v}" }.join(' '))
+      puts('  ' + $p.map{ |k,v| "#{k}=#{v}" }.join(' ')) # TODO: generalize the profiling thing to GameBase
       puts("  frame %s: %s entities" % [@frame_count, @entities.size])
       puts('  ' + @entities.to_s)
       $p.clear

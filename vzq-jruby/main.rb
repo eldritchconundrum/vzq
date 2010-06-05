@@ -51,7 +51,8 @@ def init
 end
 def play
   init
-  $engine.play(MenuScreen.new)
+  $engine.games << StartupScreen.new
+  $engine.start
 end
 def stop
   $engine.destroy

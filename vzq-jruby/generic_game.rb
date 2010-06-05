@@ -59,7 +59,7 @@ class CollisionDetector # works only with rectangles, does not support rotation
   end
 end
 
-# base class for a game (feed it to engine.play)
+# base class for a game
 class GameBase
   Keyboard = org.lwjgl.input.Keyboard unless defined?(Keyboard)
   def initialize
@@ -93,36 +93,49 @@ class GameBase
     when Keyboard::KEY_F11, Keyboard::KEY_F12
       coef = key == Keyboard::KEY_F12 ? 1.2 : (1/1.2)
       if shift then $engine.renderer.display_width *= coef else $engine.renderer.display_height *= coef end
-    when Keyboard::KEY_F1 then require 'debug' # works only once, don't use 'c'.   #require 'rubygems'; require 'ruby-debug'; debugger
+    when Keyboard::KEY_F1 then require 'debug' # works only once, don't use 'c'.
     when Keyboard::KEY_F2 then raise 'user-triggered exception'
     when Keyboard::KEY_F then $engine.renderer.fullscreen ^= true if ctrl
     when Keyboard::KEY_Q then $engine.games.clear if ctrl
-    when Keyboard::KEY_F3 then $engine.play(DebugMenuScreen.new)
+    when Keyboard::KEY_F3 then $engine.games << DebugMenuScreen.new
     end
   end
 
   def get_sprite(*resource_names)
     NormalSprite.new { resource_names.collect{ |r| $engine.texture_loader.get(r) } }
   end
-end
 
-class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
-  def initialize(exception)
-    @exception = exception
-    @extended = !$engine.games[-2].is_a?(ErrorGame) # limit ourselves to very simple error reporting if the exception comes from this class
-  end
   def write(text, pos, size = 16)
+    pos = Point2D.new(pos.x.to_i, pos.y.to_i)
     get_sprite(TextTextureDesc.new(text, size)).with(:pos => pos).draw
   end
+
   def write_list(list, pos_lambda)
-    list.each_with_index { |item, i| write(item, pos_lambda.call(i)) }
+    list.each_with_index { |item, i|
+      pos = pos_lambda.call(i)
+      write(item, pos) if pos.y < EngineConfig.ortho.y
+    }
   end
+
+end
+
+
+
+# TODO: rendre ce mode de debug utilisable en standalone (intégré à une autre app non-opengl) :)
+class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
+  def start_new; self.class.new(@exception); end
+  def initialize(exception)
+    @exception = exception
+    @crashed_game = $engine.games[-1] # not -2, since we aren't yet on the stack
+    @extended = !@crashed_game.is_a?(ErrorGame) # limit ourselves to simple error reporting if the exception comes from this class
+  end
+
   def nextFrame(isDisplayActive, delta)
     write(@exception.class, Point2D.new(150, 20), 24)
     write(@exception, Point2D.new(20, 70))
     if @extended
       write_list(@exception.backtrace, lambda { |i| Point2D.new(20, 120 + i * 20) })
-      write_list($engine.games.reverse, lambda { |i| Point2D.new(420, 20 + i * 20) })
+      write_list($engine.games.reverse.collect { |g| g.class }, lambda { |i| Point2D.new(420, 20 + i * 20) })
     else
       write('extended error mode failed, falling back to simple', Point2D.new(300, 300))
     end
@@ -131,23 +144,25 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
   private
   def process_input_simple(ctrl, shift, key)
     case key
-    when Keyboard::KEY_SPACE then $engine.games.pop # resume next :)
+    when Keyboard::KEY_SPACE then $engine.games.pop # retry
     when Keyboard::KEY_K then 2.times { $engine.games.pop } # kill the crashing game
-    when Keyboard::KEY_R then # try to restart the crashing game if supported
-      if $engine.games[-2].respond_to?(:start_new)
-        $engine.games.pop
-        crashed = $engine.games.pop
-        $engine.games << crashed.start_new
+    when Keyboard::KEY_R then
+      if ctrl # reboot the game
+        $engine.games.clear
+        $engine.games << StartupScreen.new
+      else # try to restart the crashing game if supported
+        if @crashed_game.respond_to?(:start_new)
+          2.times { $engine.games.pop }
+          $engine.games << @crashed_game.start_new
+        end
       end
     else super(ctrl, shift, key)
     end
   end
 end
 
-class MenuScreen < GameBase
-  def initialize
-    super()
-  end
+class StartupScreen < GameBase
+  def start_new; self.class.new; end
   def nextFrame(isDisplayActive, delta)
     @txt_sprite = get_sprite(TextTextureDesc.new('use arrows and space', 32)).with(:pos => Point2D.new(200, 300))
     @txt_sprite.draw
@@ -156,15 +171,14 @@ class MenuScreen < GameBase
   private
   def process_input_simple(ctrl, shift, key)
     case key
-    when Keyboard::KEY_SPACE then $engine.play(ShootEmUp.new)
+    when Keyboard::KEY_SPACE then $engine.games << ShootEmUp.new
     else super(ctrl, shift, key)
     end
   end
 end
 
-# TODO: refaire la répartition des keyboard events, ne pas mettre trop de commandes de debug dans gamebase
+# TODO: refaire la répartition des raccourcis, ne pas mettre trop de commandes de debug dans gamebase
 # généraliser système de log régulier, permettre de log dans fichier plutot pour pas pourrir irb,
-# faire un vrai menu qui a une bonne tete
 # faire une classe pour aider à l'écriture de texte à l'écran ?
 # avoir un temps écoulé qui ne soit pas affecté par la pause ou par le passage par des @games intermédiaires (menu..)
 # fix "pause" mode : implémenter via un @games ? faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
@@ -175,12 +189,10 @@ class DebugMenuScreen < GameBase # TODO: j'ai besoin d'avoir une IHM pour eval, 
     super()
     @wait_manager.add(:log) { 2000 }
   end
-  def write(text, y)
-    get_sprite(TextTextureDesc.new(text, 16)).with(:center => Point2D.new(EngineConfig.ortho.x / 2, y)).draw
-  end
+  def start_new; self.class.new; end
   def nextFrame(isDisplayActive, delta)
-    write('F9 to reload all loaded gl textures', 300)
-    write('F4 to clear the cache of gl textures', 350)
+    write('F9 to reload all loaded gl textures', Point2D.new(100, 300))
+    write('F4 to clear the cache of gl textures', Point2D.new(100, 350))
     @wait_manager.run_events
     process_input
   end
