@@ -4,9 +4,8 @@ class TextureLoader
     @font_cache = {}
   end
   def get(resource_name)
-    @cache.delete(resource_name.to_s) if resource_name.is_a?(TextTextureDesc) && rand < 0.01
+    # @cache.delete(resource_name.to_s) if resource_name.is_a?(TextTextureDesc) && rand < 0.01
     # TODO: memory? profile and optimize draw_text, or find a good caching policy for TextTextureDesc (time-based?)
-
     @cache.cache(resource_name.to_s) { Texture.new(@font_cache, resource_name) }
   end
   def reload_all

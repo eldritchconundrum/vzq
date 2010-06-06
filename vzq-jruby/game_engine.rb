@@ -6,15 +6,19 @@ class GameEngine
     @reload_code_wait = ElapsedTimeWait.new { EngineConfig.reload_code_wait_in_ms }
     @games = [] # stack
   end
-  def start
-    e = [nil] * 10
-    until @games.empty? || e.all? { |x| !x.nil? }
-      e.shift
-      e << mainloop
-    end
-    puts "can't seem to recover from errors. quitting" if !@games.empty?
+  def destroy
+    @renderer.destroy
   end
   def mainloop
+    e = [nil] * 10
+    until e.all? { |x| !x.nil? }
+      return if @games.empty?
+      (e << try_exec_one_frame).shift
+    end
+    puts "can't seem to recover from errors. quitting"
+  end
+  private
+  def try_exec_one_frame
     begin
       @renderer.renderFrame(@games.last)
       if @reload_code_wait.is_over_auto_reset
@@ -24,12 +28,9 @@ class GameEngine
       return nil
     rescue
       puts 'exception caught at main loop:', $!, $!.backtrace[0..100]
-      @games << (EngineConfig.debug ? ErrorGame.new($!) : ErrorGame.new($!)) # TODO: when not in debug, intermediate screen asking if switch to debug mode or abandon ?
+      @games << ErrorGame.new($!)
       return $!
     end
-  end
-  def destroy
-    @renderer.destroy
   end
 end
 

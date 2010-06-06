@@ -183,6 +183,11 @@ end
 # avoir un temps écoulé qui ne soit pas affecté par la pause ou par le passage par des @games intermédiaires (menu..)
 # fix "pause" mode : implémenter via un @games ? faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
 
+# debug screen : changer debug/release, profile on/off "par module"
+# modules : Rendering, Physics, Animation, Sound, Scripts, UI, Networking, Resources
+# coder un Game "éditeur de jeu"
+# généraliser le reloading de code au reloading de textures
+
 
 class DebugMenuScreen < GameBase # TODO: j'ai besoin d'avoir une IHM pour eval, dans ce truc !
   def initialize

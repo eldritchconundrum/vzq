@@ -1,10 +1,10 @@
 def java_startup
   puts "RUBY_PLATFORM != java, shouldn't you be running jruby?" unless RUBY_PLATFORM.match(/java/) #"emacs coloration fail
   require 'java'
-  gp = lambda { |s| java.lang.System.getProperty(s) }
-  lwjgl_version = gp.call('java.library.path').match(/lwjgl-[^\/]+/).to_s
-  puts 'use the run script (it sets java.library.path for you)' if lwjgl_version. == ''
-  puts 'using java vm %s %s and %s' % [gp.call('java.vm.vendor'), gp.call('java.vm.version'), lwjgl_version]
+  prop = Hash.new { |h, k| h[k] = java.lang.System.getProperty(k) }
+  lwjgl_version = prop['java.library.path'].match(/lwjgl-[^\/]+/).to_s
+  puts 'No LWJGL: use the run script (it sets java.library.path for you)', '-' * 80 if lwjgl_version == ''
+  puts 'using java vm %s %s and %s' % [prop['java.vm.vendor'], prop['java.vm.version'], lwjgl_version]
   jars = "lib/%s/**/*.jar" % lwjgl_version
   puts 'loading jars: %s' % jars if $VERBOSE
   Dir[jars].each { |jar| puts jar if $VERBOSE; require jar }
@@ -29,8 +29,8 @@ def try_to_reload_code
   }
 end
 
-# func for live runtime alteration
-$exec_once_hash = {}
+# func for live runtime alteration from code editor
+$exec_once_hash ||= {}
 def exec_once(unique) # ignore exec_once blocks that already are in the code at startup
   $exec_once_hash[unique] = nil
 end
@@ -46,25 +46,19 @@ def exec_once(unique)
 end
 
 # commands for interpreter
-def init
-  $engine ||= GameEngine.new
-end
 def play
-  init
+  $engine ||= GameEngine.new
   $engine.games << StartupScreen.new
-  $engine.start
+  $engine.mainloop
 end
 def stop
   $engine.destroy
   $engine = nil
 end
 
-if !defined?($engine)
+#if !defined?($engine)
   case $0
   when __FILE__ then play
   when /irb/
-    puts "Welcome to the closure science enrichment interpreter. Type 'play' to play, 'quit' to quit, 'cake' to get a cake. "
-    def cake; raise 'lie'; end
-    $cube = '[ <3 ]'
   end
-end
+#end

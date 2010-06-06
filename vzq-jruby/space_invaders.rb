@@ -157,6 +157,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     $p[:draw] += Utils.time { draw(delta) }
   end
 
+# faire une génération de niveau basée sur un mp3 donné par l'utilisateur :)
+
+
 # TODO : HUD with life, life bonus, other ascii art sprites
 # sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
 # tirs qui tournent : § % * # ﬅ € @ •
