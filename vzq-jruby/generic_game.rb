@@ -121,7 +121,6 @@ end
 
 
 
-# TODO: rendre ce mode de debug utilisable en standalone (intégré à une autre app non-opengl) :)
 class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
   def start_new; self.class.new(@exception); end
   def initialize(exception)
@@ -178,18 +177,8 @@ class StartupScreen < GameBase
 end
 
 # TODO: refaire la répartition des raccourcis, ne pas mettre trop de commandes de debug dans gamebase
-# généraliser système de log régulier, permettre de log dans fichier plutot pour pas pourrir irb,
-# faire une classe pour aider à l'écriture de texte à l'écran ?
-# avoir un temps écoulé qui ne soit pas affecté par la pause ou par le passage par des @games intermédiaires (menu..)
-# fix "pause" mode : implémenter via un @games ? faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
 
-# debug screen : changer debug/release, profile on/off "par module"
-# modules : Rendering, Physics, Animation, Sound, Scripts, UI, Networking, Resources
-# coder un Game "éditeur de jeu"
-# généraliser le reloading de code au reloading de textures
-
-
-class DebugMenuScreen < GameBase # TODO: j'ai besoin d'avoir une IHM pour eval, dans ce truc !
+class DebugMenuScreen < GameBase
   def initialize
     super()
     @wait_manager.add(:log) { 2000 }

@@ -6,7 +6,7 @@ class Entity
   def initialize(sprite, movement = nil)
     @sprite, @movement = sprite, movement
     @pos = @sprite.pos unless @sprite.nil?
-    @pos = @movement.pos(0) if @movement.is_a?(Trajectoire)
+    @pos = @movement.pos(0) if @movement.is_a?(Trajectory)
   end
   def sprites
     @sprite.pos = @pos
@@ -24,7 +24,7 @@ end
 # (ce serait ça le gameplay du jeu) avec des tirs différents à éviter dans chaque
 
 class Shot < Entity
-  attr_accessor :damage # TODO: separate two different types of damage, once, and 'over time' for shots that do not disappear after damaging
+  attr_accessor :damage, :dot
 end
 
 # TODO: test dynamically background size with resolution and tile it nicely
@@ -79,6 +79,7 @@ class EntitiesSet
   end
 end
 
+# TODO: faire une mini-classe autour de ça
 $p = Hash.new(0) # time profiling (ms)
 
 
@@ -87,9 +88,8 @@ $p = Hash.new(0) # time profiling (ms)
 # TODO: move animation logic (texture change) into the entities and out of sprite (not its business, unless it also handles the timing, which it doesn't)
 
 
-# il faudrait que ça lag moins
 
-class Trajectoire # ça se dit comment en anglais d'ailleurs ?
+class Trajectory # il faudrait que ça lag moins
   def initialize(pos)
     @time_origin = Utils.get_time
     @pos_origin = pos
@@ -100,7 +100,7 @@ class Trajectoire # ça se dit comment en anglais d'ailleurs ?
   end
 end
 
-class LinearTraj < Trajectoire
+class LinearTraj < Trajectory
   def initialize(pos, movement_vector)
     super(pos)
     @movement_vector = movement_vector
@@ -111,7 +111,7 @@ class LinearTraj < Trajectoire
   end
 end
 
-class PlayerInfo
+class PlayerInfo # mouaif
   attr_accessor :spread_level
   def initialize
     reset
@@ -138,7 +138,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     # use wait_manager to trigger game events at regular intervals (in no particular order)
     @wait_manager.add(:log_entities) { 5000 }
     @wait_manager.add(:add_random_aliens) { 1000 }
-    @wait_manager.add(:animate_alien_sprites) { ShootEmUpConfig.alien_frame_duration }
+    @wait_manager.add(:animate_sprites) { ShootEmUpConfig.alien_frame_duration }
     @wait_manager.add(:make_aliens_fire) { ShootEmUpConfig.alien_fire_rate }
     @wait_manager.add(:add_bonus) { ShootEmUpConfig.bonus_wait }
     @player = PlayerInfo.new
@@ -160,21 +160,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 # faire une génération de niveau basée sur un mp3 donné par l'utilisateur :)
 
 
-# TODO : HUD with life, life bonus, other ascii art sprites
-# sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
-# tirs qui tournent : § % * # ﬅ € @ •
 
-# mode ikaruga
-# shoot spread angle variation
-# profiling bug on windows
-# nanowar
-# resolution change
-# sound
-# menu générique de débug
-# trouver un ruby-debug en jruby
 # find a way to load textures in the background (threads and GL could not mix well))
 # collision detection: distance à un point au centre (tester jouabilité et comparer perfs)
-# trier TODO
 
   private
 
@@ -214,25 +202,27 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def make_aliens_fire
     @entities.tagged(:alien).each { |alien|
       next if rand > 0.01
-      create_shot = proc { |damage, speed, angle, char, tag|
-        Shot.new(get_sprite(TextTextureDesc.new(char, 32, RGBA[0, 255, 255, 255])).with(:center => alien.pos + alien.size / 2),
+      create_shot = proc { |speed, angle, char|
+        spri = get_sprite(TextTextureDesc.new(char, 32, RGBA[0, 255, 255, 255])).with(:center => alien.pos + alien.size / 2)
+        Shot.new(spri,
                  Point2D.new(speed * Math.cos(angle), speed * Math.sin(angle))
-                 ).with(:damage => damage, :tags => [:shot, :enemy_shot, :rotating] + (tag.nil? ? [] : [tag]))
+                 ).with(:tags => [:shot, :enemy_shot, :rotating])
       }
       if alien.has_tag?(:boss)
         if rand > (1 - 0.02 * @entities.count {|e| e.has_tag?(:ship) })
-          (0..9).each { |i| @entities << create_shot.call(2 ** @entities.count {|e| e.has_tag?(:ship) }, 10, Math::PI * (i + 0.5) / 10, 'LOLOLOL', :permanent_shot) }
+          dot = 2 ** @entities.count {|e| e.has_tag?(:ship) }
+          (0..9).each { |i| @entities << create_shot.call(10, Math::PI * (i + 0.5) / 10, 'LOLOLOL').with(:dot => dot) }
         elsif rand < 0.5
-          (0..10).each { |i| @entities << create_shot.call(30, 10, Math::PI * i / 10, '+', nil) }
+          (0..10).each { |i| @entities << create_shot.call(10, Math::PI * i / 10, '+').with(:damage => 30) }
         else
-          (0..9).each { |i| @entities << create_shot.call(35, 10, Math::PI * (i + 0.5) / 10, '¤', nil) }
+          (0..9).each { |i| @entities << create_shot.call(10, Math::PI * (i + 0.5) / 10, '¤').with(:damage => 35) }
         end
       end
-      @entities << create_shot.call(30, 10, rand * 100, 'o', nil)
+      @entities << create_shot.call(10, rand * 100, 'o').with(:damage => 30)
     }
   end
 
-  def animate_alien_sprites
+  def animate_sprites
     @entities.each { |e| e.sprites.each { |s| s.current_frame += 1 } }
   end
 
@@ -250,7 +240,6 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 
   def get_new_alien(pos, movement, is_boss = false)
     alien = Entity.new(get_sprite(*ShootEmUpConfig.alien_anim).with(:center => pos), movement).with(:life => 25, :tags => [:alien])
-    # stocker la fonction-trajectoire (faire une classe pour ça ?)
     if is_boss
       alien.tags << :boss
       alien.sprites.first.zoom = 2.0
@@ -297,33 +286,33 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     attr_accessor :fire_pressed, :fire2_pressed, :left_pressed, :right_pressed, :up_pressed, :down_pressed
   end
 
+  def do_damage(shot, ent, delta)
+    ent.life -= shot.dot * delta / 30.0 unless shot.dot.nil?
+    unless shot.damage.nil? || @shot_has_damaged_someone_already.has_key?(shot)
+      ent.life -= shot.damage
+      @shot_has_damaged_someone_already[shot] = true
+    end
+  end
+
   def process_collisions(delta)
-    shot_has_damaged_someone_already = {}
+    @shot_has_damaged_someone_already = {}
     cd = CollisionDetector.new(@entities)
     if true
       cd.test(@entities.tagged(:player_shot), @entities.tagged(:alien)) { |shot, alien|
-        if shot.has_tag?(:permanent_shot)
-          alien.life -= shot.damage * delta / 30.0
-        else
-          alien.life -= shot.damage unless shot_has_damaged_someone_already.has_key?(shot)
-          shot_has_damaged_someone_already[shot] = true
-        end
+        do_damage(shot, alien, delta)
       }
     end
     cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:ship)) { |shot, ship|
       next if @autoplay
-      if shot.has_tag?(:permanent_shot)
-        ship.life -= shot.damage * delta / 30.0
-      else
-        ship.life -= shot.damage unless shot_has_damaged_someone_already.has_key?(shot)
-        shot_has_damaged_someone_already[shot] = true
-      end
+      do_damage(shot, ship, delta)
     }
     cd.test(@entities.tagged(:ship), @entities.tagged(:alien)) { |ship, alien|
       next if @autoplay
-      damage = [ship.life, alien.life].min
-      ship.life -= damage
-      alien.life -= damage
+      unless ship.dead? || alien.dead?
+        damage = [ship.life, alien.life].min
+        ship.life -= damage
+        alien.life -= damage
+      end
     }
     cd.test(@entities.tagged(:ship), @entities.tagged(:bonus)) { |ship, bonus|
       @player.spread_level += 1
@@ -332,7 +321,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:arrobase_shot)) { |enemy_shot, arrobase_shot|
       @entities.remove(enemy_shot)
     }
-    @entities.remove(shot_has_damaged_someone_already.keys) # remove used shots
+    @entities.remove(@shot_has_damaged_someone_already.keys) # remove used shots
   end
 
   def change_state(delta, player_actions) # TODO: cleanup game logic
@@ -380,8 +369,8 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
             # sly chars : ★☆ȸȹɅϞϟ༄༅༗།༎༒༓༔࿂ ࿃ ࿄  ࿅࿆࿇ ࿈࿉ ࿊ ࿋ ࿌✌
             desc = TextTextureDesc.new('@', 32 * (1 + Math.log(multiplier)), RGBA[255, 255, 0, 255])
             sprite = get_sprite(desc).with(:center => ship.pos + Point2D.new(ship.size.x*0.5, 0))
-            @entities << Shot.new(sprite, Point2D.new(0, -10)).with(:damage => damage,
-                                                                    :tags => [:shot, :arrobase_shot, :player_shot, :rotating, :permanent_shot])
+            @entities << Shot.new(sprite, Point2D.new(0, -10)).with(:dot => damage,
+                                                                    :tags => [:shot, :arrobase_shot, :player_shot, :rotating])
           }
         end
         if @frame_count % 1 == 0 # peu urgent et cpu-intensif (sur mon portable)
@@ -398,7 +387,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
         @entities.each { |e|
           next if e.movement.nil?
           e.pos = e.pos + e.movement * delta.to_f / 100 if e.movement.is_a?(Point2D)
-          e.pos = e.movement.pos(delta) if e.movement.is_a?(Trajectoire)
+          e.pos = e.movement.pos(delta) if e.movement.is_a?(Trajectory)
         }
         @entities.tagged(:ship).each { |ship| # ship must stay on screen
           ship.pos.x = [[ship.pos.x, 0].max, EngineConfig.ortho.x - ship.size.x].min
