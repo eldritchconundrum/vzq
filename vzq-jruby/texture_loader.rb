@@ -78,7 +78,7 @@ class Texture
         @source_pixel_format = image.color_model.has_alpha ? GL11::GL_RGBA : GL11::GL_RGB
         @gl_texture_buffer = Texture.convert_to_gl(image, gl_size)
       else
-        raise ArgumentError.new("unknown resource. #{@resource_name.class} : #{@resource_name}") # arg error that prints the arg
+        raise ArgumentError.new("unknown resource. #{@resource_name.class} : #{@resource_name}")
       end
       remap
     }
@@ -101,6 +101,7 @@ class Texture
   end
 
   def draw
+    bind
     height_ratio = size.height.to_f / gl_size.height.to_f
     width_ratio = size.width.to_f / gl_size.width.to_f
     GL11.glBegin(GL11::GL_QUADS);

@@ -76,6 +76,7 @@ class GameBase
       keyboard_events << [Keyboard.getEventCharacter, Keyboard.getEventKeyState, Keyboard.getEventKey]
     end
     ctrl = [Keyboard::KEY_RCONTROL, Keyboard::KEY_LCONTROL].any?{|k| Keyboard.isKeyDown(k) }
+    # alter = [Keyboard::KEY_RMETA, Keyboard::KEY_LMETA].any?{|k| Keyboard.isKeyDown(k) } # conflits parfois
     shift = [Keyboard::KEY_RSHIFT, Keyboard::KEY_LSHIFT].any?{|k| Keyboard.isKeyDown(k) }
     keyboard_events.each { |char, isDown, key|
       process_input_simple(ctrl, shift, key) if isDown
@@ -110,6 +111,11 @@ class GameBase
     get_sprite(TextTextureDesc.new(text, size)).with(:pos => pos).draw
   end
 
+  def write_centered(text, pos, size = 16)
+    pos = Point2D.new(pos.x.to_i, pos.y.to_i)
+    get_sprite(TextTextureDesc.new(text, size)).with(:center => pos).draw
+  end
+
   def write_list(list, pos_lambda)
     list.each_with_index { |item, i|
       pos = pos_lambda.call(i)
@@ -122,7 +128,7 @@ end
 
 
 class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
-  def start_new; self.class.new(@exception); end
+  include Renewable
   def initialize(exception)
     @exception = exception
     @crashed_game = $engine.games[-1] # not -2, since we aren't yet on the stack
@@ -150,9 +156,9 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
         $engine.games.clear
         $engine.games << StartupScreen.new
       else # try to restart the crashing game if supported
-        if @crashed_game.respond_to?(:start_new)
+        if @crashed_game.respond_to?(:renew) # is_a?(Renewable)
           2.times { $engine.games.pop }
-          $engine.games << @crashed_game.start_new
+          $engine.games << @crashed_game.renew
         end
       end
     else super(ctrl, shift, key)
@@ -161,7 +167,7 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
 end
 
 class StartupScreen < GameBase
-  def start_new; self.class.new; end
+  include Renewable
   def nextFrame(isDisplayActive, delta)
     @txt_sprite = get_sprite(TextTextureDesc.new('use arrows and space', 32)).with(:pos => Point2D.new(200, 300))
     @txt_sprite.draw
@@ -179,11 +185,11 @@ end
 # TODO: refaire la répartition des raccourcis, ne pas mettre trop de commandes de debug dans gamebase
 
 class DebugMenuScreen < GameBase
+  include Renewable
   def initialize
     super()
     @wait_manager.add(:log) { 2000 }
   end
-  def start_new; self.class.new; end
   def nextFrame(isDisplayActive, delta)
     write('F9 to reload all loaded gl textures', Point2D.new(100, 300))
     write('F4 to clear the cache of gl textures', Point2D.new(100, 350))

@@ -3,6 +3,7 @@
 module Enumerable
   def count; n = 0; each { |x| n += 1 if yield(x) }; n; end
 end
+raise 'unit test' if [1,2,3,4].count { |n| n % 2 == 0 } != 2
 class Array
   def shuffle
     a = self.clone
@@ -14,7 +15,6 @@ class Array
   end unless respond_to?(:shuffle)
 end
 raise 'unit test' if [1,2,3,4].shuffle.nil?
-raise 'unit test' if [1,2,3,4].count { |n| n % 2 == 0 } != 2
 
 # generic additions to std lib
 
@@ -41,6 +41,28 @@ class Object
     self
   end
 end
+
+module Renewable
+ def Renewable.included(mod)
+   unless mod.respond_to?(:true_new)
+     mod.instance_eval do
+       class << mod
+         alias_method :true_new, :new
+       end
+       def new(*args)
+         obj = true_new(*args)
+         obj.instance_variable_set(:@saved_ctor_args, args)
+         return obj
+       end
+     end
+   end
+ end
+ def renew
+   self.class.new(*@saved_ctor_args)
+ end
+end
+class RenewTest; include Renewable; attr_reader :val; def initialize(arg); @val = arg; end; end
+raise 'unit test' if RenewTest.new(2097).renew.val != 2097
 
 class Point2D
   def initialize(x, y)

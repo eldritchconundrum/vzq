@@ -84,7 +84,6 @@ $p = Hash.new(0) # time profiling (ms)
 
 
 # TODO: déplacer logique de mouvement (dx/dy) hors entity pour qu'elle puisse être définie par une simple fonction du temps
-# TODO: scroller sur du background généré !
 # TODO: move animation logic (texture change) into the entities and out of sprite (not its business, unless it also handles the timing, which it doesn't)
 
 
@@ -123,6 +122,7 @@ end
 
 class GameBase; end # forward decl for reloading
 class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up pause and autoplay
+  include Renewable
   attr_accessor :entities
   def initialize
     super()
@@ -145,10 +145,6 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     init_state
   end
 
-  def start_new # trouver un moyen que cette fonction soit créée toute seule (en repassant les params du ctor)
-    self.class.new
-  end
-
   def nextFrame(isDisplayActive, delta)
     @paused = true if !isDisplayActive
     player_actions = nil
@@ -157,14 +153,8 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     $p[:draw] += Utils.time { draw(delta) }
   end
 
-# faire une génération de niveau basée sur un mp3 donné par l'utilisateur :)
-
-
-
-# find a way to load textures in the background (threads and GL could not mix well))
-# collision detection: distance à un point au centre (tester jouabilité et comparer perfs)
-
   private
+
 
   def init_state
     add_ship
@@ -327,9 +317,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def change_state(delta, player_actions) # TODO: cleanup game logic
     @frame_count += 1
 
-    $p[:colli] += Utils.time { process_collisions(delta) }
-    $p[:events] += Utils.time { @wait_manager.run_events }
-    $p[:misc] += Utils.time {
+    $p[:cs_colli] += Utils.time { process_collisions(delta) }
+    $p[:cs_events] += Utils.time { @wait_manager.run_events }
+    $p[:cs_misc] += Utils.time {
       if !@paused || @autoplay
         # process player actions
         @entities.tagged(:ship).each { |ship|
@@ -394,14 +384,16 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
           ship.pos.y = [[ship.pos.y, 0].max, EngineConfig.ortho.y - ship.size.y].min
         }
       end
+      @entities.tagged(:rotating).each { |e| e.sprites.each { |s| s.angle += delta / 2.0 } }
     }
   end
 
   def draw(delta)
-    @entities.tagged(:rotating).each { |e| e.sprites.each { |s| s.angle += delta / 2.0 } }
     # draw sprites
-    @entities.collect { |e| e.sprites }.flatten.sort_by { |sprite| sprite.z_order }.each { |sprite| sprite.draw }
+    @entities.collect { |e| e.sprites }.flatten.sort_by { |sprite| sprite.z_order }.each { |sprite|
+      $p[:d_draw] += Utils.time { sprite.draw }
+    }
     # with pause text on top
-    get_sprite(TextTextureDesc.new(@autoplay ? '-- paused (autoplay) --' : '-- paused --', 32)).with(:center => EngineConfig.ortho / 2).draw if @paused
+    write_centered(@autoplay ? '-- paused (autoplay) --' : '-- paused --', EngineConfig.ortho / 2, 32) if @paused
   end
 end

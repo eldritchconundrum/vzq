@@ -17,6 +17,10 @@ afficher le vaisseau d'une autre couleur s'il a reçu du dot pendant cette frame
 # resolution change
 # sound
 
+# faire une génération de niveau basée sur un mp3 donné par l'utilisateur :)
+# find a way to load textures in the background (threads and GL could not mix well))
+# collision detection: distance à un point au centre (tester jouabilité et comparer perfs)
+
 
   collision detection : distance-based, losange, etc. implémenter différents types
 
