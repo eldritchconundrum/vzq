@@ -167,7 +167,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   # --- WaitManager events begin ---
   def log_entities
     if $VERBOSE
-      puts('  ' + $p.map{ |k,v| "#{k}=#{v}" }.join(' ')) # TODO: generalize the profiling thing to GameBase
+      puts('  ' + $p.map{ |k,v| "#{k}=#{v}" }.join(' ')) # TODO: generalize the profiling thing to GameBase ; affichage en arbre
       puts("  frame %s: %s entities" % [@frame_count, @entities.size])
       puts('  ' + @entities.to_s)
       $p.clear
@@ -287,11 +287,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def process_collisions(delta)
     @shot_has_damaged_someone_already = {}
     cd = CollisionDetector.new(@entities)
-    if true
-      cd.test(@entities.tagged(:player_shot), @entities.tagged(:alien)) { |shot, alien|
-        do_damage(shot, alien, delta)
-      }
-    end
+    cd.test(@entities.tagged(:player_shot), @entities.tagged(:alien)) { |shot, alien|
+      do_damage(shot, alien, delta)
+    }
     cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:ship)) { |shot, ship|
       next if @autoplay
       do_damage(shot, ship, delta)

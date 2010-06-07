@@ -1,42 +1,36 @@
-# features futures
 
-# généraliser système de log régulier, permettre de log dans fichier plutot pour pas pourrir irb, config ça dynamiquement, voire mieux, garder logs en mémoire, consulter via un Game
-# avoir un temps écoulé per-game qui ne soit pas affecté par la pause ou par le passage par des @games intermédiaires (menu..)
-# fix "pause" mode : implémenter via un @games ?
-#   faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
-afficher le vaisseau d'une autre couleur s'il a reçu du dot pendant cette frame
+engine
+* sound
+* avoir un temps écoulé per-game non-affecté par la pause ou par le passage par des @games intermédiaires (menu..)
+* généraliser le reloading de code au reloading de textures/fonts quand les fichiers resources changent
+* collision detection : distance-based, losange, etc. implémenter différents types, tester jouabilité et comparer perfs
+* resolution changes
+* reuse the old scala code to replace GameEngine, Renderer, TextureLoader; separate engine/games; optimize
 
-# debug screen : changer debug/release, profile on/off "par module"
-#   modules : Rendering, Physics, Animation, Sound, Scripts, UI, Networking, Resources
-# coder un Game "éditeur de jeu"
-# généraliser le reloading de code au reloading de textures/fonts quand les fichiers resources changent
+game/debug
+* pouvoir saisir du texte -> avoir une IHM pour eval ! (avec complétion etc.)
+* généraliser système de log régulier, permettre de log dans fichier plutot, config ça dynamiquement
+  voire mieux, garder les logs en mémoire, les consulter via un Game
+* debugmenuscreen, améliorer, pouvoir le pop depuis n'importe où pour paramétrer des trucs
+  changer debug/release, profile on/off "par module"
+  modules d'engine : Rendering, Physics, Animation, Sound, Scripts, UI, Networking, Resources
+* coder un Game "éditeur de jeu", à coté de ça, coder le jeu lui-meme est fastoche :)
 
-# avoir une IHM pour eval !
+clean up
+* fix "pause" mode : implémenter via un @game ?
+  faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
+* se débarrasser de "movement" dans les entities
 
-# profiling bug on windows
-# resolution change
-# sound
+gameplay
+* afficher le vaisseau d'une autre couleur s'il a reçu du dot pendant cette frame
+* HUD with life, life bonus, other ascii art sprites
+* shoot spread angle variation
 
-# faire une génération de niveau basée sur un mp3 donné par l'utilisateur :)
-# find a way to load textures in the background (threads and GL could not mix well))
-# collision detection: distance à un point au centre (tester jouabilité et comparer perfs)
-
-
-  collision detection : distance-based, losange, etc. implémenter différents types
-
-
-# gameplay
-
-# TODO : HUD with life, life bonus, other ascii art sprites
-# sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
-# tirs qui tournent : § % * # ﬅ € @ •
-# mode ikaruga
-# shoot spread angle variation
-# nanowar
-
-
-
-# code
-debugmenuscreen, virer (améliorer errorgame)
-se débarrasser de "movement" dans les entities
-
+osef
+* noise gen
+* faire une génération de niveau basée sur les carac sonores d'un mp3 donné par l'utilisateur :)
+* find a way to load textures in the background (threads and GL may not mix well)
+* mode ikaruga
+* nanowar
+* sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
+* tirs qui ont l'air bien quand ils tournent : § % * # ﬅ € @ •

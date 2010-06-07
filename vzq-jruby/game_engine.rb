@@ -10,8 +10,8 @@ class GameEngine
     @renderer.destroy
   end
   def mainloop
-    e = [nil] * 10
-    until e.all? { |x| !x.nil? }
+    e = [nil] * 5
+    until e.all? { |x| !x.nil? } # stop automatic error handling if too many consecutive frames fail
       return if @games.empty?
       (e << try_exec_one_frame).shift
     end
@@ -68,8 +68,8 @@ class Renderer
     # Find available display modes by min and max criteria (-1 = ignored).
     # minWidth minHeight maxWidth maxHeight minBPP maxBPP minFreq maxFreq
     dm = UtilDisplay.getAvailableDisplayModes(800, 600, -1, -1, -1, -1, @display_frequency > 0 ? @display_frequency : -1, -1)
-    a = { :width => @display_width, :height => @display_height, :freq => @display_frequency, :bpp => Display.getDisplayMode.getBitsPerPixel }
-    puts a
+    a = { :width => @display_width, :height => @display_height, :freq => @display_frequency, :bpp => Display.displayMode.bitsPerPixel }
+    puts a.inspect
     a = a.collect { |k,v| java.lang.String.new('%s=%s' % [k,v]) }.to_java(:string) #^$ù*¨£%µ java
     UtilDisplay.setDisplayMode(dm, a)
     Display.create
@@ -83,7 +83,7 @@ class Renderer
     GL11.glLoadIdentity
     GL11.glViewport(0, 0, @display_width, @display_height) # un viewport c'est un rect dans lequel on va dessiner
     GL11.glBlendFunc(GL11::GL_SRC_ALPHA, GL11::GL_ONE_MINUS_SRC_ALPHA) # tester d'autres ?
-    puts("bpp=%s" % Display.getDisplayMode.getBitsPerPixel)
+    puts("freq=%s bpp=%s" % [Display.displayMode.frequency, Display.displayMode.bitsPerPixel])
     $engine.texture_loader.remap_all_textures if defined?($engine)
   end
   def initialize
