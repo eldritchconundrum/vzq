@@ -1,0 +1,38 @@
+# features futures
+
+# généraliser système de log régulier, permettre de log dans fichier plutot pour pas pourrir irb, config ça dynamiquement, voire mieux, garder logs en mémoire, consulter via un Game
+# avoir un temps écoulé per-game qui ne soit pas affecté par la pause ou par le passage par des @games intermédiaires (menu..)
+# fix "pause" mode : implémenter via un @games ?
+#   faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
+afficher le vaisseau d'une autre couleur s'il a reçu du dot pendant cette frame
+
+# debug screen : changer debug/release, profile on/off "par module"
+#   modules : Rendering, Physics, Animation, Sound, Scripts, UI, Networking, Resources
+# coder un Game "éditeur de jeu"
+# généraliser le reloading de code au reloading de textures/fonts quand les fichiers resources changent
+
+# avoir une IHM pour eval !
+
+# profiling bug on windows
+# resolution change
+# sound
+
+
+  collision detection : distance-based, losange, etc. implémenter différents types
+
+
+# gameplay
+
+# TODO : HUD with life, life bonus, other ascii art sprites
+# sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
+# tirs qui tournent : § % * # ﬅ € @ •
+# mode ikaruga
+# shoot spread angle variation
+# nanowar
+
+
+
+# code
+debugmenuscreen, virer (améliorer errorgame)
+se débarrasser de "movement" dans les entities
+
