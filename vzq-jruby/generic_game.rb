@@ -1,3 +1,4 @@
+require 'utils'
 
 # wraps one (or several) texture, adding position, zoom, angle, and looping animation
 class NormalSprite
@@ -59,8 +60,12 @@ class CollisionDetector # works only with rectangles, does not support rotation
   end
 end
 
+require 'game_engine.rb'
+
 # base class for a game
 class GameBase
+  require 'utils'
+  include Renewable
   Keyboard = org.lwjgl.input.Keyboard unless defined?(Keyboard)
   def initialize
     @wait_manager = WaitManager.new(self)
@@ -89,7 +94,7 @@ class GameBase
     when Keyboard::KEY_ESCAPE then $engine.games.pop
     when Keyboard::KEY_F9 then $engine.texture_loader.reload_all
     when Keyboard::KEY_F10
-      time = Utils.time { try_to_reload_code }
+      time = Utils.time { reload_code }
       puts("reload: %s ms" % time)
     when Keyboard::KEY_F11, Keyboard::KEY_F12
       coef = key == Keyboard::KEY_F12 ? 1.2 : (1/1.2)
@@ -116,10 +121,10 @@ class GameBase
     get_sprite(TextTextureDesc.new(text, size)).with(:center => pos).draw
   end
 
-  def write_list(list, pos_lambda)
+  def write_list(list, pos_lambda, size = 16)
     list.each_with_index { |item, i|
       pos = pos_lambda.call(i)
-      write(item, pos) if pos.y < EngineConfig.ortho.y
+      write(item, pos, size) if pos.y < EngineConfig.ortho.y
     }
   end
 
@@ -128,7 +133,6 @@ end
 
 
 class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
-  include Renewable
   def initialize(exception)
     @exception = exception
     @crashed_game = $engine.games[-1] # not -2, since we aren't yet on the stack
@@ -167,7 +171,6 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
 end
 
 class StartupScreen < GameBase
-  include Renewable
   def nextFrame(isDisplayActive, delta)
     @txt_sprite = get_sprite(TextTextureDesc.new('use arrows and space', 32)).with(:pos => Point2D.new(200, 300))
     @txt_sprite.draw
@@ -185,7 +188,6 @@ end
 # TODO: refaire la répartition des raccourcis, ne pas mettre trop de commandes de debug dans gamebase
 
 class DebugMenuScreen < GameBase
-  include Renewable
   def initialize
     super()
     @wait_manager.add(:log) { 2000 }

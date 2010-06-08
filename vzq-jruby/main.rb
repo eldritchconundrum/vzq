@@ -11,22 +11,22 @@ def java_startup
 end
 
 java_startup
-GL11 = org.lwjgl.opengl.GL11 unless defined?(GL11)
 
+require 'sysutils'
 puts 'bootstraping runtime environment'
 
 $mtimes = {}
-def try_to_reload_code
-  (Dir['*.rb'] - [__FILE__]).shuffle.each { |filename| # shuffle to ensure that the load order is not important
-    begin
-      mtime = File.mtime(filename)
-      next if $mtimes[filename] == mtime
-      $mtimes[filename] = mtime
-      load(filename)
-    rescue Exception => e
-      puts '====== while reloading code:', $!
-    end
-  }
+def load_if_mtime_changed(filename)
+  mtime = File.mtime(filename)
+  if $mtimes[filename] != mtime
+    $mtimes[filename] = mtime
+    load(filename)
+  end
+end
+
+def reload_code
+  # shuffle to ensure that the load order is not important
+  (Dir['*.rb'] - [__FILE__]).shuffle.each { |filename| load_if_mtime_changed(filename) }
 end
 
 # func for live runtime alteration from code editor
@@ -34,10 +34,7 @@ $exec_once_hash ||= {}
 def exec_once(unique) # ignore exec_once blocks that already are in the code at startup
   $exec_once_hash[unique] = nil
 end
-
-# 'require', you say? real men use:
-(Dir['*.rb'] - [__FILE__]).each { |filename| load(filename) }
-
+reload_code
 def exec_once(unique)
   if !$exec_once_hash.has_key?(unique)
     $exec_once_hash[unique] = nil
@@ -56,9 +53,7 @@ def stop
   $engine = nil
 end
 
-#if !defined?($engine)
-  case $0
-  when __FILE__ then play
-  when /irb/
-  end
-#end
+case $0
+when __FILE__ then play
+when /irb/ then puts 'type "play" to play'
+end

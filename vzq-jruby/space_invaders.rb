@@ -1,4 +1,7 @@
-# BUG: collision detection does not support the zoom factor; also, don't check the sprite rectangle, just check a small circle around the center
+require 'utils'
+
+# BUG: collision detection does not support the zoom factor;
+# also, don't check the sprite rectangle, just check a small circle around the center
 
 # Entities add some game logic to sprites
 class Entity
@@ -6,7 +9,15 @@ class Entity
   def initialize(sprite, movement = nil)
     @sprite, @movement = sprite, movement
     @pos = @sprite.pos unless @sprite.nil?
-    @pos = @movement.pos(0) if @movement.is_a?(Trajectory)
+    if @movement.is_a?(Trajectory)
+      @pos = @movement.pos(0)
+    else if @movement.is_a?(Point2D)
+           @movement = LinearTraj.new(@pos, @movement)
+           # finir : enlever la possibilité de passer une pos, pour movement
+           # corriger décentrement des origines des sprites (tir, ennemi, boss, etc) (à cause de center et de la traj)
+           # -> affecter la pos initiale à LinearTraj dans ce ctor si elle est nil
+         end
+    end
   end
   def sprites
     @sprite.pos = @pos
@@ -27,20 +38,19 @@ class Shot < Entity
   attr_accessor :damage, :dot
 end
 
-# TODO: test dynamically background size with resolution and tile it nicely
+# TODO: test dynamically background size with screen size and tile it nicely
 class Background < Entity
   def initialize(pos, sprite_creator)
     super(nil)
     @pos = pos
+    @movement = LinearTraj.new(@pos, Point2D.new(0, ShootEmUpConfig.background_speed))
     @sprites = [sprite_creator.call, sprite_creator.call]
     @sprites.each { |s| s.z_order = -1 }
   end
   def sprites
-    @movement = Point2D.new(0, ShootEmUpConfig.background_speed)
+    @pos.y %= @sprites[0].size.y
     @sprites[0].pos = @pos
-    @sprites[1].pos = @pos.clone
-    @sprites[1].pos.y = @pos.y - @sprites[0].size.y
-    @pos.y -= @sprites[0].size.y if @pos.y > EngineConfig.ortho.y # alter state
+    @sprites[1].pos = Point2D.new(@pos.x, @pos.y - @sprites[0].size.y)
     return @sprites
   end
 end
@@ -88,14 +98,16 @@ $p = Hash.new(0) # time profiling (ms)
 
 
 
-class Trajectory # il faudrait que ça lag moins
+class Trajectory
   def initialize(pos)
     @time_origin = Utils.get_time
     @pos_origin = pos
   end
-  def pos
-    elapsed_ms = Utils.get_time - @time_origin
-    Point2D.new(0, 2 * elapsed_ms / 100)
+  def elapsed_ms
+    Utils.get_time - @time_origin
+  end
+  def pos # returns a Point2D
+    fail 'abstract'
   end
 end
 
@@ -105,24 +117,27 @@ class LinearTraj < Trajectory
     @movement_vector = movement_vector
   end
   def pos(delta)
+    @pos_origin + @movement_vector * (elapsed_ms.to_f / 100)
+  end
+end
+
+class SinusoidalTraj < Trajectory
+  # amplitude is a factor of the given movement vector, 1 means a 45° maximum angle    #TODO: no it doesn't, yet
+  # freq is in Hz
+  def initialize(pos, movement_vector, amplitude = 1, frequency = 1)
+    super(pos)
+    @movement_vector, @amplitude, @frequency = movement_vector, amplitude, frequency
+  end
+  def pos(delta)
     elapsed_ms = Utils.get_time - @time_origin
-    @pos_origin + @movement_vector * (10 * elapsed_ms / 1000)
+    orthog_vect = Point2D.new(-@movement_vector.y, @movement_vector.x)
+    return @pos_origin + (@movement_vector * elapsed_ms.to_f / 100.0) +
+      (orthog_vect * (Math.sin(@frequency * elapsed_ms.to_f * Math::PI / 500) * @amplitude))
   end
 end
 
-class PlayerInfo # mouaif
-  attr_accessor :spread_level
-  def initialize
-    reset
-  end
-  def reset
-    @spread_level = 1
-  end
-end
-
-class GameBase; end # forward decl for reloading
+require 'generic_game'
 class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up pause and autoplay
-  include Renewable
   attr_accessor :entities
   def initialize
     super()
@@ -140,7 +155,8 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     @wait_manager.add(:add_random_aliens) { 1000 }
     @wait_manager.add(:animate_sprites) { ShootEmUpConfig.alien_frame_duration }
     @wait_manager.add(:make_aliens_fire) { ShootEmUpConfig.alien_fire_rate }
-    @wait_manager.add(:add_bonus) { ShootEmUpConfig.bonus_wait }
+    @wait_manager.add(:add_bonus1) { ShootEmUpConfig.bonus_wait }
+    @wait_manager.add(:add_bonus2) { ShootEmUpConfig.bonus_wait }
     @player = PlayerInfo.new
     init_state
   end
@@ -158,7 +174,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 
   def init_state
     add_ship
-     @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite(ShootEmUpConfig.bg_moon) }).with(:tags => [:background])
+    @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite(ShootEmUpConfig.bg_moon) }).with(:tags => [:background])
 #    @entities << Background.new(Point2D.new(0, 0), lambda {
 #                                  get_sprite(NoiseTextureDesc.new(Point2D.new(400, 300)))
 #                                }).with(:tags => [:background])
@@ -195,7 +211,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
       create_shot = proc { |speed, angle, char|
         spri = get_sprite(TextTextureDesc.new(char, 32, RGBA[0, 255, 255, 255])).with(:center => alien.pos + alien.size / 2)
         Shot.new(spri,
-                 Point2D.new(speed * Math.cos(angle), speed * Math.sin(angle))
+#SinusoidalTraj.new(spri.pos,
+                  Point2D.new(speed * Math.cos(angle), speed * Math.sin(angle))
+#, 10)
                  ).with(:tags => [:shot, :enemy_shot, :rotating])
       }
       if alien.has_tag?(:boss)
@@ -216,19 +234,29 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     @entities.each { |e| e.sprites.each { |s| s.current_frame += 1 } }
   end
 
-  def add_bonus
-    return if @player.spread_level >= 5
+  def add_bonus1
+    return if @player.fire_level >= 5
     direction = rand < 0.5
     pos = Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)
     @entities << Entity.new(get_sprite(TextTextureDesc.new('$', 24, RGBA[255, 128, 255, 255])).
                             with(:center => pos),
                             LinearTraj.new(pos, Point2D.new((direction ? 1 : -1) * ShootEmUpConfig.ship_move_speed, 0))
-                            ).with(:tags => [:bonus])
+                            ).with(:tags => [:bonus, :fire_bonus])
+  end
+
+  def add_bonus2
+    direction = rand < 0.5
+    pos = Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)
+    @entities << Entity.new(get_sprite(TextTextureDesc.new('£', 24, RGBA[255, 255, 255, 255])).
+                            with(:center => pos),
+                            LinearTraj.new(pos, Point2D.new((direction ? 1 : -1) * ShootEmUpConfig.ship_move_speed, 0))
+                            ).with(:tags => [:bonus, :life_bonus])
   end
 
   # --- WaitManager events end ---
 
   def get_new_alien(pos, movement, is_boss = false)
+    movement = SinusoidalTraj.new(pos, movement, is_boss ? 4 : 0, 0.5)
     alien = Entity.new(get_sprite(*ShootEmUpConfig.alien_anim).with(:center => pos), movement).with(:life => 25, :tags => [:alien])
     if is_boss
       alien.tags << :boss
@@ -276,6 +304,16 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     attr_accessor :fire_pressed, :fire2_pressed, :left_pressed, :right_pressed, :up_pressed, :down_pressed
   end
 
+  class PlayerInfo # nommage : mouaif
+    attr_accessor :fire_level
+    def initialize
+      reset
+    end
+    def reset
+      @fire_level = 1
+    end
+  end
+
   def do_damage(shot, ent, delta)
     ent.life -= shot.dot * delta / 30.0 unless shot.dot.nil?
     unless shot.damage.nil? || @shot_has_damaged_someone_already.has_key?(shot)
@@ -303,8 +341,12 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
       end
     }
     cd.test(@entities.tagged(:ship), @entities.tagged(:bonus)) { |ship, bonus|
-      @player.spread_level += 1
-      @entities.remove(bonus)
+      if bonus.has_tag?(:life_bonus)
+        @entities.tagged(:ship).each { |s| s.life += 42 }
+      else
+        @player.fire_level += 1
+      end
+#      @entities.remove(bonus)
     }
     cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:arrobase_shot)) { |enemy_shot, arrobase_shot|
       @entities.remove(enemy_shot)
@@ -320,14 +362,11 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     $p[:cs_misc] += Utils.time {
       if !@paused || @autoplay
         # process player actions
-        @entities.tagged(:ship).each { |ship|
-          e = ship
-          ship.movement = Point2D.new(0, 0)
-          ship.movement.x += ShootEmUpConfig.ship_move_speed if player_actions.right_pressed
-          ship.movement.x -= ShootEmUpConfig.ship_move_speed if player_actions.left_pressed
-          ship.movement.y += ShootEmUpConfig.ship_move_speed if player_actions.down_pressed
-          ship.movement.y -= ShootEmUpConfig.ship_move_speed if player_actions.up_pressed
-        }
+        player_movement = Point2D.new(0, 0)
+        player_movement.x += ShootEmUpConfig.ship_move_speed if player_actions.right_pressed
+        player_movement.x -= ShootEmUpConfig.ship_move_speed if player_actions.left_pressed
+        player_movement.y += ShootEmUpConfig.ship_move_speed if player_actions.down_pressed
+        player_movement.y -= ShootEmUpConfig.ship_move_speed if player_actions.up_pressed
         if player_actions.fire_pressed && @can_fire_wait.is_over_auto_reset
           @fire_spread = 1 - @fire_spread if @fire_spread_change_wait.is_over_auto_reset
           @entities.tagged(:ship).each { |ship|
@@ -335,12 +374,12 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
             shots = []
             case @fire_spread
             when 0
-              shots << [Point2D.new(ship.size.x*0.5, 0), Point2D.new(0, speed)] if @player.spread_level % 2 == 1
-              shots << [Point2D.new(ship.size.x*0.5, 10), Point2D.new(-7, speed)] if @player.spread_level / 2 >= 2
-              shots << [Point2D.new(ship.size.x*0.5, 10), Point2D.new(7, speed)] if @player.spread_level / 2 >= 2
+              shots << [Point2D.new(ship.size.x*0.5, 0), Point2D.new(0, speed)] if @player.fire_level % 2 == 1
+              shots << [Point2D.new(ship.size.x*0.5, 10), Point2D.new(-7, speed)] if @player.fire_level / 2 >= 2
+              shots << [Point2D.new(ship.size.x*0.5, 10), Point2D.new(7, speed)] if @player.fire_level / 2 >= 2
             when 1
-              shots << [Point2D.new(ship.size.x*0.5, 5), Point2D.new(-3, speed)] if @player.spread_level / 2 >= 1
-              shots << [Point2D.new(ship.size.x*0.5, 5), Point2D.new(3, speed)] if @player.spread_level / 2 >= 1
+              shots << [Point2D.new(ship.size.x*0.5, 5), Point2D.new(-3, speed)] if @player.fire_level / 2 >= 1
+              shots << [Point2D.new(ship.size.x*0.5, 5), Point2D.new(3, speed)] if @player.fire_level / 2 >= 1
             end
             shots = shots.collect { |shot| p1, p2 = *shot
               sprite = get_sprite(ShootEmUpConfig.sprite_shot).with(:center => ship.pos + p1)
@@ -372,9 +411,12 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
                            })
         end
         @entities.remove(@entities.tagged(:alien, :ship).find_all { |alien| alien.dead? }) # remove dead aliens and ships
+        @entities.tagged(:ship).each { |ship|
+          ship.pos += player_movement * delta.to_f / 100
+        }
         @entities.each { |e|
           next if e.movement.nil?
-          e.pos = e.pos + e.movement * delta.to_f / 100 if e.movement.is_a?(Point2D)
+          raise 'plop' if e.movement.is_a?(Point2D)
           e.pos = e.movement.pos(delta) if e.movement.is_a?(Trajectory)
         }
         @entities.tagged(:ship).each { |ship| # ship must stay on screen
@@ -391,6 +433,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     @entities.collect { |e| e.sprites }.flatten.sort_by { |sprite| sprite.z_order }.each { |sprite|
       $p[:d_draw] += Utils.time { sprite.draw }
     }
+    # HUD
+    items = @entities.tagged(:ship).collect { |s| s.life > 9000 ? 'over 9000' : s.life }
+    write_list(items, lambda { |i| Point2D.new(20, 20 + i * 20) }, 25)
     # with pause text on top
     write_centered(@autoplay ? '-- paused (autoplay) --' : '-- paused --', EngineConfig.ortho / 2, 32) if @paused
   end

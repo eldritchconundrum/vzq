@@ -1,3 +1,5 @@
+require 'utils'
+
 class TextureLoader
   def initialize
     @cache = {}

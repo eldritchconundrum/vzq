@@ -1,32 +1,7 @@
-# ruby-1.8 compat
+require 'sysutils'
 
-module Enumerable
-  def count; n = 0; each { |x| n += 1 if yield(x) }; n; end
-end
-raise 'unit test' if [1,2,3,4].count { |n| n % 2 == 0 } != 2
-class Array
-  def shuffle
-    a = self.clone
-    (0..a.length-2).each { |i|
-      r = rand(a.length - i - 1) + i + 1
-      a[r], a[i] = a[i], a[r]
-    }
-    return a
-  end unless respond_to?(:shuffle)
-end
-raise 'unit test' if [1,2,3,4].shuffle.nil?
+# project-specific utilities (without external dependencies)
 
-# generic additions to std lib
-
-class Hash
-  def cache(key, &block); self.has_key?(key) ? self[key] : (self[key] = block.call); end
-end
-class Module
-  def alias_accessor(new_member, aliased_member)
-    alias_method new_member, aliased_member
-    alias_method((new_member.to_s + '=').to_sym, (aliased_member.to_s + '=').to_sym)
-  end
-end
 class Numeric
   def next_power_of_two
     ret = 1
@@ -35,12 +10,6 @@ class Numeric
   end
 end
 raise 'unit test' if 5.next_power_of_two != 5.2.next_power_of_two
-class Object
-  def with(hash)
-    hash.each { |k, v| self.send(k.to_s.chomp('=') + '=', v) }
-    self
-  end
-end
 
 module Renewable
  def Renewable.included(mod)
@@ -79,10 +48,16 @@ class Point2D
   def -(p); Point2D.new(@x - p.x, @y - p.y); end
   def *(d); Point2D.new(@x * d, @y * d); end
   def /(d); Point2D.new(@x / d, @y / d); end
+  def coerce(n)
+    fail 'not a Numeric' unless n.is_a?(Numeric)
+    return self, n
+  end
 end
-raise 'unit test' if Point2D.new(2, 4) != Point2D.new(2, 4) || Point2D.new(2, 3) == Point2D.new(1, 4)
+raise 'unit test' if Point2D.new(2, 4) * 2 != 2 * Point2D.new(2, 4) || Point2D.new(2, 3) == Point2D.new(1, 4)
 
-# project-specific
+# project-specific utilities (with external dependencies)
+
+GL11 = org.lwjgl.opengl.GL11 unless defined?(GL11)
 
 class Utils
   class << self

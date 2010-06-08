@@ -1,3 +1,6 @@
+require 'utils'
+require 'texture_loader'
+
 class GameEngine
   attr_accessor :renderer, :texture_loader, :games
   def initialize
@@ -22,11 +25,11 @@ class GameEngine
     begin
       @renderer.renderFrame(@games.last)
       if @reload_code_wait.is_over_auto_reset
-        time = Utils.time { try_to_reload_code }
+        time = Utils.time { reload_code }
         puts("- reload: %s ms" % time)
       end
       return nil
-    rescue
+    rescue Exception
       puts 'exception caught at main loop:', $!, $!.backtrace[0..100]
       @games << ErrorGame.new($!)
       return $!

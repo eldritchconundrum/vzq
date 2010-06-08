@@ -1,36 +1,36 @@
-
 engine
-* sound
-* avoir un temps écoulé per-game non-affecté par la pause ou par le passage par des @games intermédiaires (menu..)
+** sound
+** avoir un temps écoulé per-game non-affecté par la pause ou par le passage par des @games intermédiaires (menu..)
 * généraliser le reloading de code au reloading de textures/fonts quand les fichiers resources changent
-* collision detection : distance-based, losange, etc. implémenter différents types, tester jouabilité et comparer perfs
-* resolution changes
-* reuse the old scala code to replace GameEngine, Renderer, TextureLoader; separate engine/games; optimize
+** collision detection : distance-based, losange, etc. implémenter différents types, tester jouabilité et comparer perfs
+** resolution changes
+** reuse the old scala code to replace GameEngine, Renderer, TextureLoader; separate engine/games; optimize
+** l'arret propre d'opengl ne marche plus : pouvoir fermer et reouvrir la fenetre opengl
 
 game/debug
-* pouvoir saisir du texte -> avoir une IHM pour eval ! (avec complétion etc.)
-* généraliser système de log régulier, permettre de log dans fichier plutot, config ça dynamiquement
+*** pouvoir saisir du texte -> avoir une IHM pour eval ! (avec complétion etc.)
+** généraliser système de log régulier, permettre de log dans fichier plutot, config ça dynamiquement
   voire mieux, garder les logs en mémoire, les consulter via un Game
-* debugmenuscreen, améliorer, pouvoir le pop depuis n'importe où pour paramétrer des trucs
+** debugmenuscreen, améliorer, pouvoir le pop depuis n'importe où pour paramétrer des trucs
   changer debug/release, profile on/off "par module"
   modules d'engine : Rendering, Physics, Animation, Sound, Scripts, UI, Networking, Resources
-* coder un Game "éditeur de jeu", à coté de ça, coder le jeu lui-meme est fastoche :)
+**** coder un Game "éditeur de jeu", à coté de ça, coder le jeu lui-meme est fastoche :)
 
 clean up
 * fix "pause" mode : implémenter via un @game ?
-  faudrait pouvoir demander un réaffichage sans logique à l'avant-dernier des @games
+  faudrait pouvoir demander un réaffichage sans logique (donc pause) à l'avant-dernier des @games
 * se débarrasser de "movement" dans les entities
+* trajs instead of other movement
 
 gameplay
-* afficher le vaisseau d'une autre couleur s'il a reçu du dot pendant cette frame
-* HUD with life, life bonus, other ascii art sprites
+** afficher le vaisseau d'une autre couleur ou quoi s'il a reçu du dot pendant cette frame
+** lifebar, other HUD, other ascii art sprites (§ % * # ﬅ € @ •)
 * shoot spread angle variation
 
 osef
-* noise gen
-* faire une génération de niveau basée sur les carac sonores d'un mp3 donné par l'utilisateur :)
-* find a way to load textures in the background (threads and GL may not mix well)
-* mode ikaruga
-* nanowar
-* sly: faire un gravity shot qui attire les tirs ennemis ou les ennemis
-* tirs qui ont l'air bien quand ils tournent : § % * # ﬅ € @ •
+***** faire une génération de niveau basée sur les carac sonores d'un mp3 donné par l'utilisateur :)
+*** find a way to load textures in the background (threads and GL may not mix well)
+*** mode ikaruga
+**** nanowar
+*** sly: faire un gameplay basé sur un gravity shot qui attire les tirs ennemis ou les ennemis
+* noise gen (faire scala avant)
