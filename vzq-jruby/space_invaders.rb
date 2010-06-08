@@ -346,7 +346,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
       else
         @player.fire_level += 1
       end
-#      @entities.remove(bonus)
+      @entities.remove(bonus)
     }
     cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:arrobase_shot)) { |enemy_shot, arrobase_shot|
       @entities.remove(enemy_shot)

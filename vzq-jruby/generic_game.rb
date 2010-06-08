@@ -161,6 +161,7 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
         $engine.games << StartupScreen.new
       else # try to restart the crashing game if supported
         if @crashed_game.respond_to?(:renew) # is_a?(Renewable)
+          puts "renew %s !" % @crashed_game.class
           2.times { $engine.games.pop }
           $engine.games << @crashed_game.renew
         end
