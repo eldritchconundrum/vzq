@@ -24,7 +24,7 @@ clean up
 
 gameplay
 ** afficher le vaisseau d'une autre couleur ou quoi s'il a reçu du dot pendant cette frame
-** lifebar, other HUD, other ascii art sprites (§ % * # ﬅ € @ •)
+** lifebar, other HUD, other ascii art sprites (§ % * # ﬅ € @ •), sly chars: ★☆ȸȹɅϞϟ༄༅༗།༎༒༓༔࿂ ࿃ ࿄  ࿅࿆࿇ ࿈࿉ ࿊ ࿋ ࿌✌
 * shoot spread angle variation
 
 osef

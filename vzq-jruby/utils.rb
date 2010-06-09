@@ -48,6 +48,8 @@ class Point2D
   def -(p); Point2D.new(@x - p.x, @y - p.y); end
   def *(d); Point2D.new(@x * d, @y * d); end
   def /(d); Point2D.new(@x / d, @y / d); end
+  def sqr_dist; @x*@x+@y*@y; end
+  def dist(p); Math.sqrt((p-self).sqr_dist); end
   def coerce(n)
     fail 'not a Numeric' unless n.is_a?(Numeric)
     return self, n

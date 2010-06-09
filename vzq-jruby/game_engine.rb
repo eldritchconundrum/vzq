@@ -23,7 +23,7 @@ class GameEngine
   private
   def try_exec_one_frame
     begin
-      @renderer.renderFrame(@games.last)
+      @renderer.render_frame(@games.last)
       if @reload_code_wait.is_over_auto_reset
         time = Utils.time { reload_code }
         puts("- reload: %s ms" % time)
@@ -44,11 +44,11 @@ class Renderer
       @show_fps_wait = ElapsedTimeWait.new { fpsTimeIntervalInMs }
       @fps = 0
     end
-    def fpsTimeIntervalInMs; 1000; end
+    def fpsTimeIntervalInMs; 500; end
     def step(delta)
       @fps += 1
       if @show_fps_wait.is_over_auto_reset
-        yield(@fps)
+        yield(@fps * 1000 / fpsTimeIntervalInMs.to_f)
         @fps = 0
       end
     end
@@ -73,7 +73,7 @@ class Renderer
     dm = UtilDisplay.getAvailableDisplayModes(800, 600, -1, -1, -1, -1, @display_frequency > 0 ? @display_frequency : -1, -1)
     a = { :width => @display_width, :height => @display_height, :freq => @display_frequency, :bpp => Display.displayMode.bitsPerPixel }
     puts a.inspect
-    a = a.collect { |k,v| java.lang.String.new('%s=%s' % [k,v]) }.to_java(:string) #^$ù*¨£%µ java
+    a = a.collect { |k,v| ('%s=%s' % [k,v]).to_java_string }.to_java(:string) #^$ù*¨£%µ java
     UtilDisplay.setDisplayMode(dm, a)
     Display.create
     GL11.glEnable(GL11::GL_TEXTURE_2D)
@@ -100,19 +100,20 @@ class Renderer
     $engine.texture_loader.destroy
     Display.destroy
   end
-  def renderFrame(game)
+  def render_frame(game)
     GL11.glClear(GL11::GL_COLOR_BUFFER_BIT)
     GL11.glMatrixMode(GL11::GL_MODELVIEW)
     GL11.glLoadIdentity
     # TODO: test different slowness-handling modes: slow down the FPS, skip rendering, time-delta-parametrized game logic...
-    # see how each react to lag or to general slowness
+    # see how each react to sudden lag or to general slowness
     Display.sync(@display_frequency) if (@display_frequency > 0)
     now = Utils.get_time
     delta, @last_loop_time = (now - @last_loop_time).to_i, now
-    @fpsCounter.step(delta) { |fps| EngineConfig.show_fps_hook(fps) }
-    game.nextFrame(Display.isActive, delta)
+    @fpsCounter.step(delta) { |fps| EngineConfig.show_fps_hook(fps) } # TODO: refactor this old stuff with events
+    game.frame_count += 1
+    game.next_frame(Display.isActive, delta)
     Display.update
-    $engine.games = [] if Display.is_close_requested?
+    $engine.games.clear if Display.is_close_requested?
   end
 end
 

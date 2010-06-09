@@ -16,6 +16,14 @@ class Array
   end unless respond_to?(:shuffle)
 end
 raise 'unit test' if [1,2,3,4].shuffle.nil?
+module Enumerable
+  def group_by
+    r = Hash.new
+    each{ |e| (r[yield(e)] ||= []) << e }
+    r
+  end
+end
+raise 'unit test' if [1,2,3,4].group_by{|n|n%2} != {1 => [1,3], 0 =>[2,4]}
 
 # truly generic additions to std lib
 

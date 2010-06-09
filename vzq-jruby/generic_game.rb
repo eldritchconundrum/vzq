@@ -19,12 +19,11 @@ class NormalSprite
   end
   def refresh_textures
     @textures = @get_textures_proc.call
-    current_frame = @current_frame # refresh the modulo: textures.size may have changed
+    current_frame = @current_frame # call the setter to refresh the modulo (textures.size may have changed)
     @size = current_texture.size
     raise 'textures size differ: %s' % @textures.collect{ |t| t.size }.join(' ') if @textures.any?{ |t| t.size != @size}
   end
   def draw
-    refresh_textures
     GL11.glPushMatrix
     current_texture.bind
 #   GL11.glPixelZoom(1, -1)
@@ -44,8 +43,7 @@ class NormalSprite
   end
 end
 
-# TODO: support different types of collision detection, customize bounds, center of sprite, distance-based, etc.
-class CollisionDetector # works only with rectangles, does not support rotation
+class RectCollisionDetector # works only with rectangles, does not support rotation
   def initialize(entities) # items in list need to have 'pos' and 'size'
     @rects = {}
     entities.each { |e|
@@ -60,6 +58,22 @@ class CollisionDetector # works only with rectangles, does not support rotation
   end
 end
 
+# TODO: support different types of collision detection, customize bounds, center of sprite, distance-based, etc.
+
+class CenterDistanceCollisionDetector
+  def initialize(entities, distance) # items in list need to have 'pos' and 'size'
+    @sqr_distance = distance ** 2
+    @center = {}
+    entities.each { |e|
+      next if e.sprites.empty?
+      @center[e] = e.pos + e.size / 2
+    }
+  end
+  def test(list1, list2, &block) # items in list1/list2 must exist in 'entities'
+    list1.each { |e1| list2.each { |e2| block.call(e1, e2) if (@center[e1] - @center[e2]).sqr_dist < @sqr_distance } }
+  end
+end
+
 require 'game_engine.rb'
 
 # base class for a game
@@ -67,10 +81,12 @@ class GameBase
   require 'utils'
   include Renewable
   Keyboard = org.lwjgl.input.Keyboard unless defined?(Keyboard)
+  attr_accessor :frame_count
   def initialize
     @wait_manager = WaitManager.new(self)
+    @frame_count = 0
   end
-  def nextFrame(isDisplayActive, delta)
+  def next_frame(isDisplayActive, delta)
     # override this to call process_input and render
   end
 
@@ -99,7 +115,7 @@ class GameBase
     when Keyboard::KEY_F11, Keyboard::KEY_F12
       coef = key == Keyboard::KEY_F12 ? 1.2 : (1/1.2)
       if shift then $engine.renderer.display_width *= coef else $engine.renderer.display_height *= coef end
-    when Keyboard::KEY_F1 then require 'debug' # works only once, don't use 'c'.
+    when Keyboard::KEY_F1 then require 'debug' # works only once
     when Keyboard::KEY_F2 then raise 'user-triggered exception'
     when Keyboard::KEY_F then $engine.renderer.fullscreen ^= true if ctrl
     when Keyboard::KEY_Q then $engine.games.clear if ctrl
@@ -134,12 +150,13 @@ end
 
 class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
   def initialize(exception)
+    super()
     @exception = exception
     @crashed_game = $engine.games[-1] # not -2, since we aren't yet on the stack
     @extended = !@crashed_game.is_a?(ErrorGame) # limit ourselves to simple error reporting if the exception comes from this class
   end
 
-  def nextFrame(isDisplayActive, delta)
+  def next_frame(isDisplayActive, delta)
     write(@exception.class, Point2D.new(150, 20), 24)
     write(@exception, Point2D.new(20, 70))
     if @extended
@@ -172,7 +189,7 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
 end
 
 class StartupScreen < GameBase
-  def nextFrame(isDisplayActive, delta)
+  def next_frame(isDisplayActive, delta)
     @txt_sprite = get_sprite(TextTextureDesc.new('use arrows and space', 32)).with(:pos => Point2D.new(200, 300))
     @txt_sprite.draw
     process_input
@@ -193,7 +210,7 @@ class DebugMenuScreen < GameBase
     super()
     @wait_manager.add(:log) { 2000 }
   end
-  def nextFrame(isDisplayActive, delta)
+  def next_frame(isDisplayActive, delta)
     write('F9 to reload all loaded gl textures', Point2D.new(100, 300))
     write('F4 to clear the cache of gl textures', Point2D.new(100, 350))
     @wait_manager.run_events
