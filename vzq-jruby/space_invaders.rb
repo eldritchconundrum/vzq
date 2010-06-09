@@ -9,15 +9,9 @@ class Entity
   def initialize(sprite, movement = nil)
     @sprite, @movement = sprite, movement
     @pos = @sprite.pos unless @sprite.nil?
-    if @movement.is_a?(Trajectory)
-      @pos = @movement.pos(0)
-    else if @movement.is_a?(Point2D)
-           @movement = LinearTraj.new(@pos, @movement)
-           # finir : enlever la possibilité de passer une pos, pour movement
-           # corriger décentrement des origines des sprites (tir, ennemi, boss, etc) (à cause de center et de la traj)
-           # -> affecter la pos initiale à LinearTraj dans ce ctor si elle est nil
-         end
-    end
+    @pos = @movement.pos(0) unless @movement.nil?
+    # corriger décentrement des origines des sprites (tir, ennemi, boss, etc) (à cause de center et de la traj)
+    # -> affecter la pos initiale à LinearTraj dans ce ctor si elle est nil
   end
   def sprites
     @sprite.pos = @pos
@@ -89,9 +83,19 @@ class EntitiesSet
   end
 end
 
-# TODO: faire une mini-classe autour de ça
-$p = Hash.new(0) # time profiling (ms)
-
+class Profiling
+  def initialize
+    @p = Hash.new(0) # time profiling (ms)
+  end
+  def prof(tag, &block)
+    @p[tag] += Utils.time(&block)
+  end
+  def show     # TODO affichage en arbre par convention de nommage
+    s = @p.map{ |k,v| "#{k}=#{v}" }.join(' ')
+    @p.clear
+    s
+  end
+end
 
 # TODO: déplacer logique de mouvement (dx/dy) hors entity pour qu'elle puisse être définie par une simple fonction du temps
 # TODO: move animation logic (texture change) into the entities and out of sprite (not its business, unless it also handles the timing, which it doesn't)
@@ -122,7 +126,7 @@ class LinearTraj < Trajectory
 end
 
 class SinusoidalTraj < Trajectory
-  # amplitude is a factor of the given movement vector, 1 means a 45° maximum angle    #TODO: no it doesn't, yet
+  # amplitude is a factor of the given movement vector, 1 means a 45° maximum angle    #TODO: no it doesn't, yet.
   # freq is in Hz
   def initialize(pos, movement_vector, amplitude = 1, frequency = 1)
     super(pos)
@@ -141,6 +145,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   attr_accessor :entities
   def initialize
     super()
+    @prof = Profiling.new
     @entities = EntitiesSet.new
     @frame_count = 0
     @paused = false
@@ -164,9 +169,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def nextFrame(isDisplayActive, delta)
     @paused = true if !isDisplayActive
     player_actions = nil
-    $p[:input] += Utils.time { player_actions = process_input }
-    $p[:change_state] += Utils.time { change_state(delta, player_actions) }
-    $p[:draw] += Utils.time { draw(delta) }
+    @prof.prof(:input) { player_actions = process_input }
+    @prof.prof(:logic) { change_state(delta, player_actions) }
+    @prof.prof(:draw) { draw(delta) }
   end
 
   private
@@ -183,10 +188,10 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   # --- WaitManager events begin ---
   def log_entities
     if $VERBOSE
-      puts('  ' + $p.map{ |k,v| "#{k}=#{v}" }.join(' ')) # TODO: generalize the profiling thing to GameBase ; affichage en arbre
+      # TODO: generalize the profiling thing to GameBase
+      puts('  ' + @prof.show)
       puts("  frame %s: %s entities" % [@frame_count, @entities.size])
       puts('  ' + @entities.to_s)
-      $p.clear
     end
   end
 
@@ -210,10 +215,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
       next if rand > 0.01
       create_shot = proc { |speed, angle, char|
         spri = get_sprite(TextTextureDesc.new(char, 32, RGBA[0, 255, 255, 255])).with(:center => alien.pos + alien.size / 2)
+        mv = Point2D.new(speed * Math.cos(angle), speed * Math.sin(angle))
         Shot.new(spri,
-#SinusoidalTraj.new(spri.pos,
-                  Point2D.new(speed * Math.cos(angle), speed * Math.sin(angle))
-#, 10)
+                 LinearTraj.new(spri.pos, mv)
                  ).with(:tags => [:shot, :enemy_shot, :rotating])
       }
       if alien.has_tag?(:boss)
@@ -357,9 +361,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def change_state(delta, player_actions) # TODO: cleanup game logic
     @frame_count += 1
 
-    $p[:cs_colli] += Utils.time { process_collisions(delta) }
-    $p[:cs_events] += Utils.time { @wait_manager.run_events }
-    $p[:cs_misc] += Utils.time {
+    @prof.prof(:logic_colli) { process_collisions(delta) }
+    @prof.prof(:logic_events) { @wait_manager.run_events }
+    @prof.prof(:logic_misc) {
       if !@paused || @autoplay
         # process player actions
         player_movement = Point2D.new(0, 0)
@@ -383,7 +387,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
             end
             shots = shots.collect { |shot| p1, p2 = *shot
               sprite = get_sprite(ShootEmUpConfig.sprite_shot).with(:center => ship.pos + p1)
-              Shot.new(sprite, p2).with(:damage => 5, :tags => [:shot, :player_shot])
+              Shot.new(sprite, LinearTraj.new(sprite.pos, p2)).with(:damage => 5, :tags => [:shot, :player_shot])
             }
             @entities << shots
           }
@@ -396,8 +400,9 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
             # sly chars : ★☆ȸȹɅϞϟ༄༅༗།༎༒༓༔࿂ ࿃ ࿄  ࿅࿆࿇ ࿈࿉ ࿊ ࿋ ࿌✌
             desc = TextTextureDesc.new('@', 32 * (1 + Math.log(multiplier)), RGBA[255, 255, 0, 255])
             sprite = get_sprite(desc).with(:center => ship.pos + Point2D.new(ship.size.x*0.5, 0))
-            @entities << Shot.new(sprite, Point2D.new(0, -10)).with(:dot => damage,
-                                                                    :tags => [:shot, :arrobase_shot, :player_shot, :rotating])
+            @entities << Shot.new(sprite, LinearTraj.new(sprite.pos, Point2D.new(0, -10))
+                                  ).with(:dot => damage,
+                                         :tags => [:shot, :arrobase_shot, :player_shot, :rotating])
           }
         end
         if @frame_count % 1 == 0 # peu urgent et cpu-intensif (sur mon portable)
@@ -431,7 +436,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def draw(delta)
     # draw sprites
     @entities.collect { |e| e.sprites }.flatten.sort_by { |sprite| sprite.z_order }.each { |sprite|
-      $p[:d_draw] += Utils.time { sprite.draw }
+      @prof.prof(:draw_sprite) { sprite.draw }
     }
     # HUD
     items = @entities.tagged(:ship).collect { |s| s.life > 9000 ? 'over 9000' : s.life }

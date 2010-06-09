@@ -32,5 +32,6 @@ osef
 *** find a way to load textures in the background (threads and GL may not mix well)
 *** mode ikaruga
 **** nanowar
-*** sly: faire un gameplay basé sur un gravity shot qui attire les tirs ennemis ou les ennemis
+*** sly: faire un gameplay basé sur un gravity shot qui attire les tirs ennemis ou les ennemis,
+    	 bump qui les envoie valdinguer comme au billard, un bouclier qui renvoie les tirs aux ennemis...
 * noise gen (faire scala avant)

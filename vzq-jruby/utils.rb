@@ -90,11 +90,11 @@ class WaitManager
       interval = @interval_funcs[name].call # only call them again on code reload?
       if last_time + interval <= now
         @last_times[name] = now
-        begin
+        #begin
           @target.send(name)
-        rescue NoMethodError
-          puts "event manager: #{$!}"
-        end
+        #rescue NoMethodError
+        #  puts "event manager: #{$!}"
+        #end
       end
     }
   end
