@@ -43,34 +43,26 @@ class NormalSprite
   end
 end
 
-class RectCollisionDetector # works only with rectangles, does not support rotation
-  def initialize(entities) # items in list need to have 'pos' and 'size'
-    @rects = {}
-    entities.each { |e|
-      next if e.sprites.empty?
-      rect = java.awt.Rectangle.new
-      rect.set_bounds(e.pos.x.to_i, e.pos.y.to_i, e.size.x, e.size.y)
-      @rects[e] = rect
+class Profiling # TODO: move to generic_game; reuse this instead of other profiling code
+  def initialize
+    @p = Hash.new(0) # time profiling (ms)
+    @last = Utils.get_time
+  end
+  def prof(tag, &block)
+    @p[tag] += Utils.time(&block)
+  end
+  def show
+    now = Utils.get_time
+    duration, @last = (now - @last), now
+    @p.each { |k,v| @p[k] = ((v * 1000.0 / duration)*10).round/10.0 }
+    groups = @p.group_by { |k,v| k.to_s.match(/^[^_]*_/).to_s }
+    s = ''
+    groups.each { |group_key, kv_list|
+      s += "%s* = %s\n" % [group_key, kv_list.transpose[1].inject(0) {|a,b|a+b} ]
+      kv_list.each { |kv| s += "\t%s\t= %s\n" % kv }
     }
-  end
-  def test(list1, list2, &block) # items in list1/list2 must exist in 'entities'
-    list1.each { |e1| list2.each { |e2| block.call(e1, e2) if @rects[e1].intersects(@rects[e2]) } }
-  end
-end
-
-# TODO: support different types of collision detection, customize bounds, center of sprite, distance-based, etc.
-
-class CenterDistanceCollisionDetector
-  def initialize(entities, distance) # items in list need to have 'pos' and 'size'
-    @sqr_distance = distance ** 2
-    @center = {}
-    entities.each { |e|
-      next if e.sprites.empty?
-      @center[e] = e.pos + e.size / 2
-    }
-  end
-  def test(list1, list2, &block) # items in list1/list2 must exist in 'entities'
-    list1.each { |e1| list2.each { |e2| block.call(e1, e2) if (@center[e1] - @center[e2]).sqr_dist < @sqr_distance } }
+    @p.clear
+    s
   end
 end
 
@@ -100,12 +92,12 @@ class GameBase
     # alter = [Keyboard::KEY_RMETA, Keyboard::KEY_LMETA].any?{|k| Keyboard.isKeyDown(k) } # conflits parfois
     shift = [Keyboard::KEY_RSHIFT, Keyboard::KEY_LSHIFT].any?{|k| Keyboard.isKeyDown(k) }
     keyboard_events.each { |char, isDown, key|
-      process_input_simple(ctrl, shift, key) if isDown
+      process_key(ctrl, shift, key) if isDown
     }
     return keyboard_events # for overrides
   end
 
-  def process_input_simple(ctrl, shift, key)
+  def process_key(ctrl, shift, key)
     case key
     when Keyboard::KEY_ESCAPE then $engine.games.pop
     when Keyboard::KEY_F9 then $engine.texture_loader.reload_all
@@ -168,7 +160,7 @@ class ErrorGame < GameBase # used when toplevel gets an exception in debug mode
     process_input
   end
   private
-  def process_input_simple(ctrl, shift, key)
+  def process_key(ctrl, shift, key)
     case key
     when Keyboard::KEY_SPACE then $engine.games.pop # retry
     when Keyboard::KEY_K then 2.times { $engine.games.pop } # kill the crashing game
@@ -195,7 +187,7 @@ class StartupScreen < GameBase
     process_input
   end
   private
-  def process_input_simple(ctrl, shift, key)
+  def process_key(ctrl, shift, key)
     case key
     when Keyboard::KEY_SPACE then $engine.games << ShootEmUp.new
     else super(ctrl, shift, key)
@@ -220,7 +212,7 @@ class DebugMenuScreen < GameBase
   def log
     $engine.texture_loader.instance_eval('puts(@cache.values)')
   end
-  def process_input_simple(ctrl, shift, key)
+  def process_key(ctrl, shift, key)
     case key
     when Keyboard::KEY_F4 then $engine.texture_loader.clear
     else super(ctrl, shift, key)

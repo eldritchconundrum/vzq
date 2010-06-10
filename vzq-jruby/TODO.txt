@@ -1,10 +1,18 @@
+code/clean up
+* fix "pause" mode : implémenter via un @game ?
+  faudrait pouvoir demander un réaffichage sans logique (donc pause) à l'avant-dernier des @games
+* trajs accelration, composition, randomization...
+* archi, nettoyer le découpage
+
 engine
 ** sound
-** avoir un temps écoulé per-game non-affecté par la pause ou par le passage par des @games intermédiaires (menu..)
+** avoir un temps écoulé per-game non-affecté par la pause ou par le passage par des @games intermédiaires (menu..) (comme @framecount mais en ms)
 * généraliser le reloading de code au reloading de textures/fonts quand les fichiers resources changent
 ** collision detection : distance-based, losange, etc. implémenter différents types, tester jouabilité et comparer perfs
 ** resolution changes
-** reuse the old scala code to replace GameEngine, Renderer, TextureLoader; separate engine/games; optimize
+** reuse the old scala code to replace GameEngine, Renderer, TextureLoader; separate engine (scala)/games (ruby)
+   learn Rakefile as a portable, easier alternative to replace Makefile of scala proj
+   modules d'engine : Rendering, Animation, Scripts, UI, Resources (Networking, Sound, Physics)
 ** l'arret propre d'opengl ne marche plus : pouvoir fermer et reouvrir la fenetre opengl
 
 game/debug
@@ -13,25 +21,19 @@ game/debug
   voire mieux, garder les logs en mémoire, les consulter via un Game
 ** debugmenuscreen, améliorer, pouvoir le pop depuis n'importe où pour paramétrer des trucs
   changer debug/release, profile on/off "par module"
-  modules d'engine : Rendering, Physics, Animation, Sound, Scripts, UI, Networking, Resources
 **** coder un Game "éditeur de jeu", à coté de ça, coder le jeu lui-meme est fastoche :)
-
-clean up
-* fix "pause" mode : implémenter via un @game ?
-  faudrait pouvoir demander un réaffichage sans logique (donc pause) à l'avant-dernier des @games
-* se débarrasser de "movement" dans les entities
-* trajs instead of other movement
 
 gameplay
 ** afficher le vaisseau d'une autre couleur ou quoi s'il a reçu du dot pendant cette frame
 ** lifebar, other HUD, other ascii art sprites (§ % * # ﬅ € @ •), sly chars: ★☆ȸȹɅϞϟ༄༅༗།༎༒༓༔࿂ ࿃ ࿄  ࿅࿆࿇ ࿈࿉ ࿊ ࿋ ࿌✌
 * shoot spread angle variation
 
-osef
+misc/osef
 ***** faire une génération de niveau basée sur les carac sonores d'un mp3 donné par l'utilisateur :)
 *** find a way to load textures in the background (threads and GL may not mix well)
 *** mode ikaruga
 **** nanowar
 *** sly: faire un gameplay basé sur un gravity shot qui attire les tirs ennemis ou les ennemis,
     	 bump qui les envoie valdinguer comme au billard, un bouclier qui renvoie les tirs aux ennemis...
-* noise gen (faire scala avant)
+** jouer 2 vaisseaux dans 2 moitiés d'écran en synchronisé avec des tirs différents à éviter dans chaque moitié
+* noise gen, mandelbrot (faire scala avant pour optim)

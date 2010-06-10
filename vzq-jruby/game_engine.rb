@@ -113,7 +113,8 @@ class Renderer
     game.frame_count += 1
     game.next_frame(Display.isActive, delta)
     Display.update
-    $engine.games.clear if Display.is_close_requested?
+
+    $engine.games = [] if Display.is_close_requested?
   end
 end
 

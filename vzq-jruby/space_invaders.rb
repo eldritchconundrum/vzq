@@ -1,172 +1,16 @@
-require 'utils'
+require 'generic_shoot'
 
-# TODO: make a shoot'em-up-specific layer between this game and GameBase
-
-# BUG: collision detection does not support the zoom factor;
-# also, don't check the sprite rectangle, just check a small circle around the center
-
-# Entities add some game logic to sprites
-class Entity
-  attr_accessor :pos, :movement, :frame_index, :tags, :rect, :life # TODO: move some entity state elsewhere?
-  def initialize(sprite, movement = nil)
-    @sprite, @movement = sprite, movement
-    @pos = @sprite.pos unless @sprite.nil?
-    @pos = @movement.pos(0) unless @movement.nil?
-    # corriger décentrement des origines des sprites (tir, ennemi, boss, etc) (à cause de center et de la traj)
-    # -> affecter la pos initiale à LinearTraj dans ce ctor si elle est nil
-  end
-  def sprites
-    @sprite.pos = @pos
-    return [@sprite]
-  end
-  def size # the first sprite is supposed to be the 'main' sprite, for purposes such as collision checking (FIXME)
-    sprites.first.size * sprites.first.zoom
-  end
-  def has_tag?(tag); @tags.include?(tag); end
-  def dead?; @life <= 0; end
-  def to_s; "[%s]" % tags; end
-end
-
-# idée : jouer deux vaisseaux dans 2 moitiés d'écran en synchronisé
-# (ce serait ça le gameplay du jeu) avec des tirs différents à éviter dans chaque
-
-class Shot < Entity
-  attr_accessor :damage, :dot
-end
-
-# TODO: test dynamically background size with screen size and tile it nicely
-class Background < Entity
-  def initialize(pos, sprite_creator)
-    super(nil)
-    @pos = pos
-    @movement = LinearTraj.new(@pos, Point2D.new(0, ShootEmUpConfig.background_speed))
-    @sprites = [sprite_creator.call, sprite_creator.call]
-    @sprites.each { |s| s.z_order = -1 }
-  end
-  def sprites
-    @pos.y %= @sprites[0].size.y
-    @sprites[0].pos = @pos
-    @sprites[1].pos = Point2D.new(@pos.x, @pos.y - @sprites[0].size.y)
-    return @sprites
-  end
-end
-
-# optimization. I could use a list, but
-# searching everytime makes 'tagged' slow, so use hash tables to keep entities indexed by tags
-# 'tagged' is called every frame, 'entities add/remove' are not.
-class EntitiesSet # store entities with fast 'by tag' access
-  include Enumerable # uses 'each'
-  def initialize
-    @list = []
-    @lists_by_tag_list = Hash.new { |h,tags| h[tags] = @list.find_all { |e| matches(tags, e) } }
-  end
-  def size; @list.size; end
-  def <<(arg); add(arg); end
-  def add(*arg); arg = Utils.array_from_varargs(arg); arg.each { |item| add_internal(item) }; end
-  def remove(*arg); arg = Utils.array_from_varargs(arg); arg.each { |item| remove_internal(item) }; end
-  def each(*args, &block); @list.each(*args, &block); end
-  def tagged(*tags) # tagged(:alien, :boss) returns entities tagged :alien or :boss or both
-    @lists_by_tag_list[tags].clone
-  end
-  def to_s
-    self.collect { |e| e.tags }.flatten.uniq.collect { |tag| '%s %s' % [tag, self.tagged(tag).size] }.join(', ')
-  end
-  private
-  def matches(tags, item); tags.any? { |t| item.has_tag?(t) }; end
-  def add_internal(item)
-    @list << item
-    @lists_by_tag_list.each { |tags,list| list << item if matches(tags, item) }
-  end
-  def remove_internal(item)
-    @list.delete(item)
-    @lists_by_tag_list.each { |tags,list| list.delete(item) if matches(tags, item) }
-    # this assumes tags don't change!
-  end
-end
-
-class Profiling # TODO: move to generic_game; reuse this instead of other profiling code
-  def initialize
-    @p = Hash.new(0) # time profiling (ms)
-    @last = Utils.get_time
-  end
-  def prof(tag, &block)
-    @p[tag] += Utils.time(&block)
-  end
-  def show
-    now = Utils.get_time
-    duration, @last = (now - @last), now
-    @p.each { |k,v| @p[k] = ((v * 1000.0 / duration)*100).round/100.0 }
-    groups = @p.group_by { |k,v| k.to_s.match(/^[^_]*_/).to_s }
-    s = ''
-    groups.each { |group_key, kv_list|
-      s += "%s* = %s\n" % [group_key, kv_list.transpose[1].inject(0) {|a,b|a+b} ]
-      kv_list.each { |kv| s += "\t%s\t= %s\n" % kv }
-    }
-    #s = @p.map{ |k,v| "#{k}=#{v}" }.join(' ')
-    @p.clear
-    s
-  end
-end
-
-# TODO: déplacer logique de mouvement (dx/dy) hors entity pour qu'elle puisse être définie par une simple fonction du temps
-# TODO: move animation logic (texture change) into the entities and out of sprite (not its business, unless it also handles the timing, which it doesn't)
-
-
-
-class Trajectory
-  def initialize(pos)
-    @time_origin = Utils.get_time
-    @pos_origin = pos
-  end
-  def elapsed_ms
-    Utils.get_time - @time_origin
-  end
-  def pos # returns a Point2D
-    fail 'abstract'
-  end
-end
-
-class LinearTraj < Trajectory
-  def initialize(pos, movement_vector)
-    super(pos)
-    @movement_vector = movement_vector
-  end
-  def pos(delta)
-    @pos_origin + @movement_vector * (elapsed_ms.to_f / 100)
-  end
-end
-
-class SinusoidalTraj < Trajectory
-  # amplitude is a factor of the given movement vector, 1 means a 45° maximum angle    #TODO: no it doesn't, yet.
-  # freq is in Hz
-  def initialize(pos, movement_vector, amplitude = 1, frequency = 1)
-    super(pos)
-    @movement_vector, @amplitude, @frequency = movement_vector, amplitude, frequency
-  end
-  def pos(delta)
-    elapsed_ms = Utils.get_time - @time_origin
-    orthog_vect = Point2D.new(-@movement_vector.y, @movement_vector.x)
-    return @pos_origin + (@movement_vector * elapsed_ms.to_f / 100.0) +
-      (orthog_vect * (Math.sin(@frequency * elapsed_ms.to_f * Math::PI / 500) * @amplitude))
-  end
-end
-
-require 'generic_game'
-class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up pause and autoplay
+class ShootEmUp < ShootEmUpBase # TODO: move pause logic to base class? and clean up pause and autoplay
   attr_accessor :entities
   def initialize
     super()
-    @prof = Profiling.new
-    @entities = EntitiesSet.new
-    @paused = false
     @autoplay = true
-    @fire_spread = 0
+    @fire_spread = 0 # belongs to ship?
     # use ElapsedTimeWait to enforce a mandatory delay between player actions
     @fire_wait = ElapsedTimeWait.new { ShootEmUpConfig.fire_rate }
     @fire2_wait = ElapsedTimeWait.new { ShootEmUpConfig.fire_rate * 50 }
     @fire_spread_change_wait = ElapsedTimeWait.new { ShootEmUpConfig.fire_rate }
     # use wait_manager to trigger game events at regular intervals (in no particular order)
-    @wait_manager.add(:log_entities) { 5000 }
     @wait_manager.add(:add_random_aliens) { 1000 }
     @wait_manager.add(:animate_sprites) { ShootEmUpConfig.alien_frame_duration }
     @wait_manager.add(:make_aliens_fire) { ShootEmUpConfig.alien_fire_rate }
@@ -187,7 +31,6 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 
   private
 
-
   def init_state
     add_ship
     @entities << Background.new(Point2D.new(-300, 0), lambda { get_sprite(ShootEmUpConfig.bg_moon) }).with(:tags => [:background])
@@ -197,15 +40,6 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   end
 
   # --- WaitManager events begin ---
-  def log_entities
-    if $VERBOSE
-      # TODO: generalize the profiling thing to GameBase
-      puts(@prof.show.gsub(/^/, '  '))
-      puts("  frame %s: %s entities" % [@frame_count, @entities.size])
-      puts('  ' + @entities.to_s)
-    end
-  end
-
   def add_random_aliens
     n = 7
     case (rand(35) / 10.0).to_i
@@ -213,7 +47,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     when 1 then j, speed = 2, 3
     when 2 then j, speed = 3, 4
     else # boss
-      @entities << get_new_alien(Point2D.new(EngineConfig.ortho.x.to_f * 0.5, -50), Point2D.new(0, 5), true)
+      @entities << get_new_alien(Point2D.new(EngineConfig.ortho.x.to_f / 2, -50), Point2D.new(0, 5), true)
       return
     end
     @entities << get_new_alien(Point2D.new(EngineConfig.ortho.x.to_f * j / n, -50), Point2D.new(0, speed))
@@ -227,9 +61,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
       create_shot = proc { |speed, angle, char|
         spri = get_sprite(TextTextureDesc.new(char, 32, RGBA[0, 255, 255, 255])).with(:center => alien.pos + alien.size / 2)
         mv = Point2D.new(speed * Math.cos(angle), speed * Math.sin(angle))
-        Shot.new(spri,
-                 LinearTraj.new(spri.pos, mv)
-                 ).with(:tags => [:shot, :enemy_shot, :rotating])
+        Shot.new(spri, LinearTraj.new(spri.pos, mv)).with(:tags => [:shot, :enemy_shot, :rotating])
       }
       if alien.has_tag?(:boss)
         if rand > (1 - 0.02 * @entities.count {|e| e.has_tag?(:ship) })
@@ -253,8 +85,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     return if @player.fire_level >= 5
     direction = rand < 0.5
     pos = Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)
-    @entities << Entity.new(get_sprite(TextTextureDesc.new('$', 24, RGBA[255, 128, 255, 255])).
-                            with(:center => pos),
+    @entities << Entity.new(get_sprite(TextTextureDesc.new('$', 24, RGBA[255, 128, 255, 255])).with(:center => pos),
                             LinearTraj.new(pos, Point2D.new((direction ? 1 : -1) * ShootEmUpConfig.ship_move_speed, 0))
                             ).with(:tags => [:bonus, :fire_bonus])
   end
@@ -262,8 +93,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   def add_bonus2
     direction = rand < 0.5
     pos = Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)
-    @entities << Entity.new(get_sprite(TextTextureDesc.new('£', 24, RGBA[255, 255, 255, 255])).
-                            with(:center => pos),
+    @entities << Entity.new(get_sprite(TextTextureDesc.new('£', 24, RGBA[255, 255, 128, 255])).with(:center => pos),
                             LinearTraj.new(pos, Point2D.new((direction ? 1 : -1) * ShootEmUpConfig.ship_move_speed, 0))
                             ).with(:tags => [:bonus, :life_bonus])
   end
@@ -271,16 +101,20 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
   # --- WaitManager events end ---
 
   def get_new_alien(pos, movement, is_boss = false)
+    sprite = get_sprite(*ShootEmUpConfig.alien_anim).with(:center => pos)
+    if is_boss
+      sprite.zoom = 2.0
+      sprite.center = pos = Point2D.new(EngineConfig.ortho.x.to_f / 2.0, -50) - sprite.size / 2
+    end
     movement = SinusoidalTraj.new(pos, movement, is_boss ? 4 : 0, 0.5)
-    alien = Entity.new(get_sprite(*ShootEmUpConfig.alien_anim).with(:center => pos), movement).with(:life => 25, :tags => [:alien])
+    alien = Entity.new(sprite, movement).with(:life => 25, :tags => [:alien])
     if is_boss
       alien.tags << :boss
-      alien.sprites.first.zoom = 2.0
-      alien.pos = Point2D.new(EngineConfig.ortho.x.to_f * 0.5, -50) - alien.sprites.first.size
       alien.life *= 20
     end
     return alien
   end
+
   def add_ship
     @entities << Entity.new(get_sprite(ShootEmUpConfig.sprite_ship).with(:center => Point2D.new(400, 500))).with(:life => 100, :tags => [:ship])
   end
@@ -312,12 +146,12 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
     end
     return player_actions
   end
-  class PlayerActions
+
+  class PlayerActions # voir autre remarque sur Struct
     def initialize
-      @fire_pressed, @fire2_pressed, @left_pressed, @right_pressed, @up_pressed, @down_pressed = false, false, false, false, false, false
+      @fire_pressed, @fire2_pressed, @left_pressed, @right_pressed, @up_pressed, @down_pressed = [false] * 6
     end
     attr_accessor :fire_pressed, :fire2_pressed, :left_pressed, :right_pressed, :up_pressed, :down_pressed
-    attr_accessor :movement
   end
 
   class PlayerInfo # nommage : mouaif
@@ -332,7 +166,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
 
   def do_damage(shot, ent, delta)
     ent.life -= shot.dot * delta / 30.0 unless shot.dot.nil?
-    unless shot.damage.nil? || @shot_has_damaged_someone_already.has_key?(shot)
+    unless shot.damage.nil? || ent.dead? || @shot_has_damaged_someone_already.has_key?(shot)
       ent.life -= shot.damage
       @shot_has_damaged_someone_already[shot] = true
     end
@@ -436,7 +270,7 @@ class ShootEmUp < GameBase # TODO: move pause logic to base class? and clean up 
                            })
         end
         @entities.remove(@entities.tagged(:alien, :ship).find_all { |alien| alien.dead? })
-        @entities.each { |e| e.pos = e.movement.pos(delta) unless e.movement.nil? }
+        @entities.each { |e| e.pos = e.movement.pos unless e.movement.nil? }
         @entities.tagged(:rotating).each { |e| e.sprites.each { |s| s.angle += delta / 2.0 } }
       }
     end
