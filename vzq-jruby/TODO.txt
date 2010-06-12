@@ -1,7 +1,7 @@
 code/clean up
 * fix "pause" mode : implémenter via un @game ?
   faudrait pouvoir demander un réaffichage sans logique (donc pause) à l'avant-dernier des @games
-* trajs accelration, composition, randomization...
+* trajs accelération, composition, randomization...
 * archi, nettoyer le découpage
 
 engine
@@ -14,6 +14,8 @@ engine
    learn Rakefile as a portable, easier alternative to replace Makefile of scala proj
    modules d'engine : Rendering, Animation, Scripts, UI, Resources (Networking, Sound, Physics)
 ** l'arret propre d'opengl ne marche plus : pouvoir fermer et reouvrir la fenetre opengl
+* fichier de conf en yaml écrivable par le jeu pour contenir les options locales du joueur
+* ou pour décrire les associations de fichier aux sprites ?
 
 game/debug
 *** pouvoir saisir du texte -> avoir une IHM pour eval ! (avec complétion etc.)
@@ -21,10 +23,11 @@ game/debug
   voire mieux, garder les logs en mémoire, les consulter via un Game
 ** debugmenuscreen, améliorer, pouvoir le pop depuis n'importe où pour paramétrer des trucs
   changer debug/release, profile on/off "par module"
+  faire des checkbutton, déplacement au clavier, souris, toute une IHM graphique
 **** coder un Game "éditeur de jeu", à coté de ça, coder le jeu lui-meme est fastoche :)
 
 gameplay
-** afficher le vaisseau d'une autre couleur ou quoi s'il a reçu du dot pendant cette frame
+** afficher ship/alien d'une autre couleur ou quoi s'il a reçu du dot pendant cette frame, trouver un gfx quelconque
 ** lifebar, other HUD, other ascii art sprites (§ % * # ﬅ € @ •), sly chars: ★☆ȸȹɅϞϟ༄༅༗།༎༒༓༔࿂ ࿃ ࿄  ࿅࿆࿇ ࿈࿉ ࿊ ࿋ ࿌✌
 * shoot spread angle variation
 
