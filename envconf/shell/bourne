@@ -1,3 +1,4 @@
+export PATH=~/bin/:$PATH
 
 alias l='ls -la'
 alias grep='grep --color=auto'
