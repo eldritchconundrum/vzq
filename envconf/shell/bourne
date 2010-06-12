@@ -26,3 +26,5 @@ function e ()
 function rot13 () {
         tr 'a-z' 'n-za-m'
 }
+
+test x != x$DISPLAY && test -r ~/.Xresources && xrdb -merge ~/.Xresources
