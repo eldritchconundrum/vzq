@@ -1,13 +1,13 @@
 ! comments begin with '!'
+! the command you seek is: xrdb -merge ~/.Xresources
 
-xterm*reverseVideo:		true
 xterm*color4:			#80A0FF
 xterm*color10:			#00DD00
 xterm*color14:			#00DDFF
 xterm*background:		black
 xterm*foreground:		white
 
-Emacs*font:			fixed
+Emacs*font:			Monospace
 Emacs*Foreground:		white
 Emacs*Background:		grey10
 ! emacs top menu
