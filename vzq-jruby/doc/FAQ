@@ -1,0 +1,28 @@
+
+	Q: Why this project?
+	A: For the lulz. I wanted to create a game and to learn scala. Then I wanted to embed an interpreter.
+	   I had problems achieving what I wanted. Then I switched to jruby, and I love it. It's so much more
+	   faster (to compile) than scala. I thought that "when I have time" I would go back to scala.
+	   Then I added the automatic code reloading system. And it's so much fun playing with this and ruby.
+	   If one day, I settle on a gameplay, I will rewrite things in a faster language than ruby, and
+	   finally get rid of those frames that take several times their 16ms, because of the GC every second
+	   or so.
+
+	Q: Did you actually get questions before writing this FAQ?
+	A: No. I don't have friends so when I feel alone and need to talk to someone, I write FAQs.
+
+	Q: Are you aware this is not the recommended way for naming java packages?
+	A: Yes.
+
+	Q: May I explain why you should consider anyway-
+	A: No.
+
+	Q: What does VZQ stand for?
+	A: Virtually Zero Quality?
+	   Vagrant Zombie Quartet?
+	   Vulgar Zoom Quest?
+	   Vivacious Zenith Quirk?
+	   Submit your ideas into /dev/null
+
+	Q: Why the inexistant documentation, broken and unused tests, and dead code everywhere?
+	A: Live coding is too much fun. Can't stop. No time

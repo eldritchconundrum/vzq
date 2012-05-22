@@ -1,0 +1,5 @@
+An_Teallach_panorama
+	http://commons.wikimedia.org/wiki/File:An_Teallach_panorama.jpg
+	public domain
+Vera.ttf
+	http://www.gnome.org/fonts/

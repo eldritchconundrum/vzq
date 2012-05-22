@@ -1,0 +1,13 @@
+scala
+	A JVM-based object and functional programming language
+	http://www.scala-lang.org/
+	(BSD license)
+lwjgl
+	Lightweight Java Game Library (opengl wrapper)
+	http://www.lwjgl.org/
+	(BSD license)
+
+mp3spi, vorbisspi
+	mp3 and ogg Service Provider Interfaces for the Java Sound API
+	http://www.javazoom.net/
+	(LGPL)
