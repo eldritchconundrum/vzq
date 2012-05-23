@@ -185,7 +185,7 @@ class EngineSingleton
       RAL.reset_display(EngineConfig.ortho)
       GL11.glViewport(0, 0, @display_width, @display_height) # un viewport c'est un rect dans lequel on va dessiner
       puts("freq=%s bpp=%s" % [Display.displayMode.frequency, Display.displayMode.bitsPerPixel])
-      puts "oh hai. can has vbo = %s, %s" % [RAL.is_vbo_capable, RAL.is_vbo_capable ? "kthx" : "nowai"]
+      puts "o hai. can has vbo = %s, %s" % [RAL.is_vbo_capable, RAL.is_vbo_capable ? "kthx" : "nowai"]
       Engine.texture_cache.remap_all_textures if defined?(Engine)
     end
     def render_frame(game)
@@ -197,8 +197,8 @@ class EngineSingleton
         frms = Engine.frames[-fps..-1] || Engine.frames
         slowest_frame_time = frms.collect { |f| f.duration }.max
         Engine.renderer.title = '%s/%s FPS | VZQ' % [fps, 1000 / (slowest_frame_time+1)]
-        worst_5_in_ms = frms.map{|f|f.duration}.sort.reverse[1..10] * ', '
-        puts("FPS: %s, worst: %s (%s)" % [fps, 1000 / (slowest_frame_time+1), worst_5_in_ms])
+        worst_10_in_ms = frms.map{|f|f.duration}.sort.reverse[1..10] * ', '
+        puts("FPS: %s, worst: %sms (%s)" % [fps, 1000 / (slowest_frame_time+1), worst_10_in_ms])
         puts "display not visible" unless Display.isVisible
       end
       if Display.isVisible # !isVisible = minimized

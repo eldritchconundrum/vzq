@@ -43,12 +43,6 @@ class TestBench < GameScreen
     sprites = Engine.profiler.prof(:olddraw_sort) {
       @entities.collect { |e|  e.update_sprite_pos; e.sprites }.flatten.sort_by { |sprite| sprite.z_order }
     }
-    Engine.profiler.prof(:olddraw_sprites) {
-      sprites.each { |sprite|
-        sprite.refresh_textures if false#EngineConfig.debug # a bit slow
-        sprite.draw
-      }
-    }
     @txt_sprite = get_sprite(TextDrawer.new('TODO', 144)).with(:pos => Point2D.new(100, 100))
     @txt_sprite.draw
     write("ce jue n'est pas un jue sur le cyclimse", Point2D.new(500, 10))

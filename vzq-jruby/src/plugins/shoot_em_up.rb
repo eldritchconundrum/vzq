@@ -24,7 +24,6 @@ module ShootEmUpGame
   ShootEmUpConfig.add_enemies_delay.set 1000
 
   ShootEmUpConfig.ship_move_speed.set 40
-  ShootEmUpConfig.bonus_wait.set 8000
   ShootEmUpConfig.background_speed.set 5
 
   module Model
@@ -60,8 +59,6 @@ module ShootEmUpGame
         @wait_manager.add(:log_entities, 5000)
         @wait_manager.add(:add_random_enemies, ShootEmUpConfig.add_enemies_delay)
         @wait_manager.add(:enemy_fire_ticked, ShootEmUpConfig.enemy_fire_delay)
-        @wait_manager.add(:add_bonus1, ShootEmUpConfig.bonus_wait)
-        @wait_manager.add(:add_bonus2, ShootEmUpConfig.bonus_wait)
         @bg_traj = LinearTraj.new(0, Point2D.new(0, 0),
                                   Point2D.new(0, ShootEmUpConfig.background_speed.from_config_value))
         @wait_manager.add(:add_guile, 30000)
@@ -105,23 +102,6 @@ module ShootEmUpGame
           end
           add_entity(create_shot(enemy, 15, rand * 100, 'o').with(:damage => 30))
         }
-      end
-
-      def add_bonus1
-        return if @fire_level >= 5
-        direction = rand < 0.5
-        pos = Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)
-        bonus_speed = ShootEmUpConfig.ship_move_speed.from_config_value
-        traj = LinearTraj.new(@clock, pos, Point2D.new((direction ? 1 : -1) * bonus_speed, 0))
-        add_entity(Entity.new(@screen.make_bonus1_sprite, traj), [:bonus, :fire_bonus])
-      end
-
-      def add_bonus2
-        direction = rand < 0.5
-        pos = Point2D.new(direction ? 0 : EngineConfig.ortho.x, 10+rand*EngineConfig.ortho.y/3)
-        bonus_speed = ShootEmUpConfig.ship_move_speed.from_config_value
-        traj = LinearTraj.new(@clock, pos, Point2D.new((direction ? 1 : -1) * bonus_speed, 0))
-        add_entity(Entity.new(@screen.make_bonus2_sprite, traj), [:bonus, :life_bonus])
       end
 
       def add_random_enemies
@@ -217,80 +197,90 @@ module ShootEmUpGame
         @entities.each { |e| e.update_traj(time) }
       end
 
-      def misc_logic(delta)
-#puts @entities.size if Engine.frame_count % 5 == 0
-        Engine.profiler.prof(:logic_misc3) {
+      def process_dead_things_and_update_rotations(delta)
+          # dead enemies
           dead_enemies = @entities.tagged(:enemy).find_all { |enemy| enemy.dead? }
+          for dead_enemy in dead_enemies
+            when_enemy_dies(dead_enemy)
+          end
           for ship in @entities.tagged(:ship)
-            ship.life += dead_enemies.size
+            ship.life += dead_enemies.size unless @autoplay
           end
+          # dead ships
           dead_ships = @entities.tagged(:ship).find_all { |ship| ship.dead? }
+          # explode them
           dead_entities = dead_ships + dead_enemies
-          for entity in dead_entities
-            explode_at(entity)
+          for dead_entity in dead_entities
+            explode_at(dead_entity)
           end
+          # 'dead' explosions
           dead_entities += @entities.tagged(:explosion).find_all { |e| e.dead? }
           @entities.remove_list(dead_entities)
+
+          # rotate sprites
           @entities.tagged(:rotating).each do |e|
             e.sprite.angle += delta * e.revolutions_per_second * Math::Tau / 1000.0
           end
+      end
+
+      def when_enemy_dies(dead_enemy)
+        (dead_enemy.tags.include?(:boss) ? 5 : 1).times {
+          if rand < 0.01
+            drop_fire_bonus(dead_enemy.center)
+          elsif rand < 0.05
+            drop_life_bonus(dead_enemy.center)
+          end
         }
+      end
+
+      def drop_fire_bonus(pos)
+        return drop_life_bonus(pos) if @fire_level >= 5
+        bonus_speed = ShootEmUpConfig.ship_move_speed.from_config_value / 2
+        traj = LinearTraj.new(@clock, pos, Point2D.new(0, bonus_speed))
+        add_entity(Entity.new(@screen.make_bonus1_sprite, traj), [:bonus, :fire_bonus])
+      end
+
+      def drop_life_bonus(pos)
+        bonus_speed = ShootEmUpConfig.ship_move_speed.from_config_value / 2
+        traj = LinearTraj.new(@clock, pos, Point2D.new(0, bonus_speed))
+        add_entity(Entity.new(@screen.make_bonus2_sprite, traj), [:bonus, :life_bonus])
       end
 
 
       # --- collisions begin
 
+      # This class exists for the sole purpose of being used by
+      # the collision detector to detect out-of-screen entities.
       class FakeEntityRect
         def initialize(collision_box)
           @collision_box = collision_box
         end
         def sprite; self; end
         def has_tag?(tag); false; end
-        def collision_box
-          @collision_box
+        def collision_box; @collision_box; end
+        def to_s; @collision_box.inspect; end
+        class << self
+          def create_list(margin) # margin outside of the screen's bounds
+            far = 1000 * 1000
+            [FakeEntityRect.new([-far, -far, far - margin.x, far * 2]),
+             FakeEntityRect.new([-far, -far, far * 2, far - margin.y]),
+             FakeEntityRect.new([EngineConfig.ortho.x + margin.x, -far, far, far * 2]),
+             FakeEntityRect.new([-far, EngineConfig.ortho.y + margin.y, far * 2, far])]
+          end
         end
-        def to_s
-          @collision_box.inspect
-        end
-      end
-
-      def make_fake_entities_for_autoremove(margin)
-        far = 1000 ** 3
-        [FakeEntityRect.new([-far, -far, far - margin.x, far * 2]),
-         FakeEntityRect.new([-far, -far, far * 2, far - margin.y]),
-         FakeEntityRect.new([EngineConfig.ortho.x + margin.x, -far, far, far * 2]),
-         FakeEntityRect.new([-far, EngineConfig.ortho.y + margin.y, far * 2, far])]
       end
 
       def setup_collisions
-# en cours : faire marcher l'autoremove offscreen par collisions et plus par parcours lent
-        if false
-        Engine.profiler.prof(:logic_misc1) {
-          # TODO: time-critical: mais je suis bete, y'a qu'Ã  gÃ©rer Ã§a avec rectcollisiondetection ?
-          if Engine.frame_count % 3 == 0
-            # remove some off screen entities
-            @entities.remove_list(@entities.tagged(:shot, :enemy, :bonus).find_all { |e|
-                                    si = e.sprite.display_size
-                                    margin = si.x + si.y + 300
-                                    po = e.center
-                                    ort = EngineConfig.ortho
-                                    !po.y.between?(-margin, ort.y + margin) ||
-                                    !po.x.between?(-margin, ort.x + margin)
-                                  })
-          end
-        }
-        end
-
         collision_entities = @entities.to_a
 
-        if true
-        @fake_entities_for_way_out_of_screen_detection1 ||=
-          make_fake_entities_for_autoremove(Point2D.new(100, 100)) # TODO : trouver le max des tailles de sprites de shot et bonus ? ou tester leur traj ? ou trouver un autre moyen
-        @fake_entities_for_way_out_of_screen_detection2 ||=
-          make_fake_entities_for_autoremove(@screen.make_enemy2_enemy_sprite.display_size * 2) # TODO: pareil
-        collision_entities.concat(@fake_entities_for_way_out_of_screen_detection1)
-        collision_entities.concat(@fake_entities_for_way_out_of_screen_detection2)
-        end
+        @oos_detection_entities_1 ||=
+          FakeEntityRect.create_list(Point2D.new(100, 100))
+        # TODO : trouver le max des tailles de sprites de shot et bonus ? ou tester leur traj ? ou trouver un autre moyen
+        @oos_detection_entities_2 ||=
+          FakeEntityRect.create_list(@screen.make_enemy2_enemy_sprite.display_size * 2)
+
+        collision_entities.concat(@oos_detection_entities_1)
+        collision_entities.concat(@oos_detection_entities_2)
 
         @colli_thread = nil
         # @colli_thread = Thread.new {}
@@ -309,70 +299,72 @@ module ShootEmUpGame
           @shot_has_damaged_someone_already = {}
           Engine.profiler.prof(:logic_colli_test) {
 
-            if true
             # autoremove out-of-screen shots/bonus/enemies
-            cd.test(@entities.tagged(:shot, :bonus),
-                    @fake_entities_for_way_out_of_screen_detection1) do |e,f|
-              @entities.remove(e)
+            cd.test(@entities.tagged(:shot, :bonus), @oos_detection_entities_1) do |e,f|
+              @entities.remove(e) unless @clock.time - e.traj.time_origin < 1000
             end
-            cd.test(@entities.tagged(:enemy),
-                    @fake_entities_for_way_out_of_screen_detection2) do |e,f|
+            cd.test(@entities.tagged(:enemy), @oos_detection_entities_2) do |e,f|
               @entities.remove(e) unless @clock.time - e.traj.time_origin < 3000
             end
-            end
+
 if true
+            # shot collides with enemy
             cd.test(@entities.tagged(:player_shot), @entities.tagged(:enemy)) { |shot, enemy|
-              do_damage(shot, enemy, delta)
+              when_shot_damages_entity(shot, enemy, delta)
               enemy.revolutions_per_second = -1 if enemy.tags.include?(:mario_kart_fish)
             }
+            # enemy shot collides with ship
             cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:ship)) { |shot, ship|
               next if @autoplay # test inside the loop to bench collision detector
-              do_damage(shot, ship, delta)
+              when_shot_damages_entity(shot, ship, delta)
             }
+            # ship collides with enemy
             cd.test(@entities.tagged(:ship), @entities.tagged(:enemy)) { |ship, enemy|
               next if @autoplay # test inside the loop to bench collision detector
-              do_collide(ship, enemy, delta)
+              when_ship_collides_with_enemy(ship, enemy, delta)
             }
+            # ship gets bonus
             cd.test(@entities.tagged(:ship), @entities.tagged(:bonus)) { |ship, bonus|
               if bonus.has_tag?(:life_bonus)
-                @entities.tagged(:ship).each { |s| s.life += 42 }
+                ship.life += 42
               else
-                @fire_level += 1
+                @fire_level += 1 # TODO: a var in ship, not global
               end
               @entities.remove(bonus)
             }
+            # '@' shot collides with enemy shot
             cd.test(@entities.tagged(:enemy_shot), @entities.tagged(:arrobase_shot)) { |enemy_shot, arrobase_shot|
               @entities.remove(enemy_shot)
-              @entities.tagged(:ship).each { |ship| ship.life += 1 }
+              @entities.tagged(:ship).each { |ship| ship.life += 1 } #TODO: just the ship of the shot
             }
 end
           }
-          Engine.profiler.prof(:logic_misc2) {
+          Engine.profiler.prof(:logic_expl_and_del_shots) {
             @entities.remove_list(@shot_has_damaged_someone_already.keys) # remove used shots
             for shot in @shot_has_damaged_someone_already.keys
-              explode_at shot
+              explode_at(shot)
             end
           }
         end
       end
 
-      def do_damage(shot, ent, delta)
-        do_dot(ent, shot.dot, delta, shot) unless shot.dot.nil?
+      def when_shot_damages_entity(shot, ent, delta)
+        damage_over_time(ent, shot.dot, delta, shot) unless shot.dot.nil?
         unless shot.damage.nil? || ent.dead? || @shot_has_damaged_someone_already.has_key?(shot)
           ent.life -= shot.damage
           @shot_has_damaged_someone_already[shot] = true
         end
       end
 
-      def do_dot(target, delta, dot_value = 1, where = nil)
+      def damage_over_time(target, delta, dot_value = 1, where = nil)
         target.life -= dot_value * delta / 30.0
         explode_at where if where.has_tag? :ship # don't make a big explosion on enemies by dot
       end
 
-      def do_collide(ship, enemy, delta)
+      def when_ship_collides_with_enemy(ship, enemy, delta)
         unless ship.dead? || enemy.dead?
-          do_dot(ship, delta, 2, ship)
-          do_dot(enemy, delta, 2, enemy)
+          damage_over_time(ship, delta, 2, ship)
+          damage_over_time(enemy, delta, 2, enemy)
         end
       end
 
@@ -414,7 +406,6 @@ end
               sprite = @screen.make_shoot2_sprite.with(:zoom => 1)
               traj = LinearTraj.new(@clock, center, p2)
             end
-            # TODO: dessin: animer le sprite de tir ! qu'il ait l'air de tourner sur lui-meme
             Shot.new(sprite, traj).with(:damage => 5, :tags => [:shot, :player_shot])
           }
           @entities.add_list(shots)
@@ -439,10 +430,10 @@ end
 
     end
 
-    class SpeedPerfTest < ShootEmUp
+    class SpeedPerfTest < ShootEmUp # slightly different model for perf test
       def init_music
       end
-      def add_ship
+      def add_ship # 3 ships
         sprites = Array.new(3) { |i|
           [@screen.make_ship_sprite, Point2D.new(300 + i * 100, 500)]
         }
@@ -457,11 +448,11 @@ end
         }
         add_entity(create_enemy(Point2D.new(xmax / 2, -50), Point2D.new(0, 5), :enemy2))
       end
-      def do_damage(shot, ent, delta)
+      def when_shot_damages_entity(shot, ent, delta) # no damage
       end
-      def do_collide(ship, enemy, delta)
+      def when_ship_collides_with_enemy(ship, enemy, delta) # no damage
       end
-      def add_guile
+      def add_guile # no guile
         :remove_this_event
       end
     end
@@ -490,18 +481,18 @@ end
 
     def inactive_draw
       sprites = nil
-      Engine.profiler.prof(:draw_misc1) do
+      Engine.profiler.prof(:draw_background) do
         # vertically-scrolling background
         bg_sprite ||= self.make_background_sprite
         bg_h = bg_sprite.display_size.y
         bg_y = @model.bg_traj.position(@clock.time).y % bg_h
         if EngineConfig2.use_display_lists_not_drawarray.from_config_value
-if true
+#if true
           bg_sprite.pos.y = bg_y
           bg_sprite.draw
           bg_sprite.pos.y -= bg_h
           bg_sprite.draw
-end
+#end
         else
           bg_tex = bg_sprite.current_texture
           bg_tex.batch_compute_vertices do |add_sprite|
@@ -511,17 +502,15 @@ end
           bg_tex.batch_draw
         end
       end
-      # entities sprites
-      Engine.profiler.prof(:draw_misc2) do
-        sprites = @model.entities.collect { |e| [e.sprite] }.flatten
-        for sprite in sprites
-          sprite.refresh_textures if false #EngineConfig.debug # a bit slow
-        end
-        sprites
+      # refreshing textures of entities is slow. only refresh a random one per frame.
+      Engine.profiler.prof(:draw_refresh_textures) do
+        sprites = @model.entities.collect { |e| e.sprite }.flatten
+        sprite = sprites[rand*sprites.size]
+        sprite.refresh_textures
       end
       # draw sprites
       if EngineConfig2.use_display_lists_not_drawarray.from_config_value
-        Engine.profiler.prof(:draw_sort) { sprites = sprites.sort_by { |sprite| sprite.z_order } }
+        Engine.profiler.prof(:draw_zorder_sort) { sprites = sprites.sort_by { |sprite| sprite.z_order } }
         Engine.profiler.prof(:draw_sprites) { for sprite in sprites do sprite.draw end }
       else
         # z_order-sorted list of hash<tex, sprites>
@@ -578,6 +567,7 @@ end
           end
         end
       }
+      # TODO: un layer d'indirection sur les constantes de clavier, pour pouvoir confer les keybindings sur un écran à part
       player_actions.left_pressed = true if Keyboard.isKeyDown(Keyboard::KEY_LEFT)
       player_actions.right_pressed = true if Keyboard.isKeyDown(Keyboard::KEY_RIGHT)
       player_actions.up_pressed = true if Keyboard.isKeyDown(Keyboard::KEY_UP)
@@ -588,7 +578,7 @@ end
       # pratique pour tester en codant, et propre : on simule l'input du joueur
       if @model.autoplay
         player_actions = PlayerActions.new
-        player_actions.right_pressed = (@clock.time % 7000) < 4000
+        player_actions.right_pressed = (@clock.time % 7000) < 4000 # la meilleure IA en 3 lignes du monde ! bluffant
         player_actions.left_pressed = (@clock.time % 5000) > 2000
         player_actions.fire_pressed = (@clock.time % 5000) % 3000 > 500
       end
@@ -614,7 +604,7 @@ end
 
       Engine.profiler.prof(:logic_events) { @wait_manager.run_events }
       Engine.profiler.prof(:logic_player) { @model.process_player_actions(player_actions, delta) }
-      @model.misc_logic(delta)
+      Engine.profiler.prof(:logic_dead_rotate) { @model.process_dead_things_and_update_rotations(delta) }
       Engine.profiler.prof(:logic_update_traj) { @model.update_all_traj }
       Engine.profiler.prof(:logic_sprite_frame) {
         @model.entities.each { |e| [e.sprite].each { |s| s.current_frame += 1 } } # see sprite.frame_duration

@@ -92,7 +92,7 @@ module ShootEmUpGame # en fait c'est pas spécifique au shmup...
       private
       def file_sprite(*drawers)
         #drawers = filenames.collect { |f| f.respond_to?(:draw) ? f : FileDrawer.new(f) }
-        NormalSprite.new { drawers.collect{ |d| Engine.texture_cache.get(d) } }
+        VZQSprite.new { drawers.collect{ |d| Engine.texture_cache.get(d) } }
       end
 
       def get_animation_from_tileset(filename, xcount, ycount, xsize, ysize) # left to right then top to bottom

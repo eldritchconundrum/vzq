@@ -1,6 +1,6 @@
 # -*- coding: iso-8859-1 -*-
 # wraps one (or several) texture, adding position, zoom, angle, and looping animation
-class NormalSprite
+class VZQSprite
   attr_accessor :textures, :zoom, :angle, :anim_loop, :z_order # zoom can be a number or a 2D point
   attr_accessor :frame_duration
   attr_accessor :pos
@@ -31,7 +31,7 @@ class NormalSprite
     # TODO: move animation logic (texture change) into the entities and out of sprite? (not its business, unless it also handles the timing, which it doesn't)
 
   end
-  def refresh_textures
+  def refresh_textures # get the texture again from the texture cache, or the drawer if not found
     @textures = @get_textures_proc.call
     current_frame = @current_frame # call the setter to refresh the modulo (textures.size may have changed)
     unless current_texture.nil?
@@ -60,7 +60,7 @@ end
 # textures represent gl textures ; drawers are the texture creators
 # sprites are texture wrappers with state for position, zooom, rotation, z_order (ext)
 # entities are sprites with game logic
-# NormalSprites are sprites with animation using one texture for one frame
+# VZQSprites are sprites with animation using one texture for one frame
 # TODO: sprites with animation via subtexture drawing?
 
 require 'drawers'
@@ -142,7 +142,7 @@ class GameScreen # base class for a screen
   end
 
   def get_sprite(drawer)
-    NormalSprite.new { [Engine.texture_cache.get(drawer)] }
+    VZQSprite.new { [Engine.texture_cache.get(drawer)] }
   end
 
   def write(text, pos, size = 16, color = RGBAWhite)

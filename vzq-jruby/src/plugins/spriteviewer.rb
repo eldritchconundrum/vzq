@@ -26,7 +26,7 @@ class SpriteViewer < GameScreen
     unless @current.nil?
       write(@current.drawer.to_s[0..200], Point2D.new(0, 0))
       write("zoom: %s, pos=%s, size=%s" % [@zoom, @pos, @current.size], Point2D.new(0, 16))
-      NormalSprite.new { [@current] }.with(:zoom => @zoom, :pos => @pos + Point2D.new(0, 8 + 16 * 2)).draw
+      VZQSprite.new { [@current] }.with(:zoom => @zoom, :pos => @pos + Point2D.new(0, 8 + 16 * 2)).draw
     end
   end
 
