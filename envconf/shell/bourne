@@ -1,10 +1,18 @@
-export PATH=~/bin/:$PATH
+export PATH=~/bin/:$PATH:/D/install/swift/usr/bin/
+export HISTFILESIZE=-1
+export HISTSIZE=-1
+export HISTCONTROL=ignoredups
 
 alias l='ls -la'
 alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 alias m=make
+alias x="xdg-open"
+
+alias cp="cp -i"
+alias mv="mv -i"
+alias rm="rm -i"
 
 which colordiff >/dev/null && alias diff=colordiff
 
@@ -13,6 +21,9 @@ alias ~="cd ~"
 alias -- -="cd -"
 alias ..="cd .."
 alias ...="cd ../.."
+
+alias gs="git status"
+alias gd="git diff"
 
 function L()
 {
@@ -36,4 +47,38 @@ function rot13 () {
         tr 'a-z' 'n-za-m'
 }
 
+
+function set_prompt()
+{
+    local last_cmd=$?
+    local txtreset='$(tput sgr0)'
+    local txtbold='$(tput bold)'
+    local txtblack='$(tput setaf 0)'
+    local txtred='$(tput setaf 1)'
+    local txtgreen='$(tput setaf 2)'
+    local txtyellow='$(tput setaf 3)'
+    local txtblue='$(tput setaf 4)'
+    local txtpurple='$(tput setaf 5)'
+    local txtcyan='$(tput setaf 6)'
+    local txtwhite='$(tput setaf 7)'
+    local fancyx='\342\234\227'      # unicode "✗"
+    local checkmark='\342\234\223'   # unicode "✓"
+
+    PS1=""
+    PS1+="\[$txtbold\]\[$txtgreen\]\u@\h\[$txtwhite\]:"
+    #PS1+="\[$txtwhite\]\D{%H:%M:%S}"
+    PS1+=" \[$txtblue\]\w"
+    PS1+="\[$txtpurple\]$(__git_ps1 ' (%s)') "
+
+    # a red "✗" or a green "✓" and the error number
+    if [[ $last_cmd == 0 ]]; then
+        PS1+="\[$txtgreen\]$checkmark\[$txtwhite\]"
+    	PS1+="\[$txtreset\]\[$txtwhite\]\\$\[$txtwhite\] "
+    else
+        PS1+="\[$txtred\]$last_cmd\[$txtreset\]\[$txtwhite\]\\$ "
+    fi
+}
+PROMPT_COMMAND='set_prompt'
+
 test x != x$DISPLAY && test -r ~/.Xresources && xrdb -merge ~/.Xresources
+true

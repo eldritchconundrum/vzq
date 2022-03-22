@@ -24,7 +24,20 @@
 (global-set-key (kbd "<f12>") 'call-last-kbd-macro)
 (global-set-key [C-f12]       'start-end-kbd-macro)
 
+(global-set-key (kbd "<C-prior>") 'previous-buffer);ctrl+pgup
+(global-set-key (kbd "<C-next>") 'next-buffer);ctrl+pgdown
 
 ;(global-set-key [mouse-4]  '(lambda nil (interactive) (scroll-up 2)))
 ;(global-set-key [mouse-5]  '(lambda nil (interactive) (scroll-down 2)))
 
+(global-set-key [(control tab)] `other-window)
+(global-set-key (read-kbd-macro "<C-S-iso-lefttab>") (lambda ()
+  (interactive (other-window -1))))
+;(global-set-key (kbd "<C-tab>") 'other-window)
+;(global-set-key (kbd "<C-S-tab>") (lambda () (interactive (other-window -1))))
+
+(global-set-key (kbd "<C-kp-add>") 'text-scale-increase)
+(global-set-key (kbd "<C-kp-subtract>") 'text-scale-decrease)
+
+(global-set-key (kbd "<C-mouse-4>") 'text-scale-increase)
+(global-set-key (kbd "<C-mouse-5>") 'text-scale-decrease)
